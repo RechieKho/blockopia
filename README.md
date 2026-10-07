@@ -22,8 +22,24 @@ as a content pack in Lua.
 # with Keycloak running (see "Sign-in"):
 vb pack dev                             # host with restart-on-save and open the client
 
-# without Keycloak (development only, nobody is verified):
-vb host --pack . -- --insecure-skip-auth
+# without Keycloak, on a released engine build (local singleplayer, nobody is verified):
+.dev/tools/play_local.sh
+```
+
+> **Released engine builds (0.1.2) cannot show this pack over a network yet.** They are compiled
+> without `VB_WITH_COMPRESSION`, which switches asset sync off, so a client that joins a server
+> (including `vb pack dev`) never receives `ui/*.lua` or `textures/`: no HUD, menus, chat or
+> hotbar, and every block is white. Singleplayer reads both from disk, so use
+> `.dev/tools/play_local.sh` until the engine ships builds with asset sync. See
+> `docs/ENGINE_NOTES.md`.
+
+`play_local.sh` copies the pack without `auth.lua` to `.dev/local/` and starts singleplayer on the
+copy (run it again after editing). Accounts are then keyed `dev:<player name>`.
+
+On an engine you built yourself (no `-DVB_DISTRIBUTION=ON`) you can also host without Keycloak:
+
+```sh
+vb host --pack . -- --insecure-skip-auth   # custom builds only: released builds reject the flag
 vb launch --connect localhost
 ```
 
@@ -58,9 +74,9 @@ Then register a user at `http://localhost:8080/realms/blockopia/account`. Modera
 Keycloak **groups** named `moderators` and `admins` (add a user to a group in the admin console).
 For another host set `[auth] issuer` / `client_id` in `server.toml` (see `server.toml.example`).
 
-Developing without Keycloak: run the server with `--insecure-skip-auth` as above (`vb pack dev`
-does not add it). Accounts are then keyed `dev:<player name>`. The flag does not exist in release
-builds.
+Developing without Keycloak: use `.dev/tools/play_local.sh` (singleplayer, works on released
+builds) or, on a custom engine build only, run the server with `--insecure-skip-auth` (`vb pack dev`
+does not add it). Accounts are then keyed `dev:<player name>`.
 
 ## Layout
 
@@ -75,7 +91,7 @@ builds.
 | `data/*.lua` | server | everything tunable: items, splice recipes, lock tiers, store, `balance.lua` |
 | `ui/*.lua` | client UI VM | HUD and screens (cannot touch `vb`) |
 | `ops/keycloak/` | - | Keycloak + Postgres compose file and realm export |
-| `.dev/` | - | tests and tools; dot-directories are not loaded as pack code |
+| `.dev/` | - | tests and tools (`tools/play_local.sh`); dot-directories are not loaded as pack code |
 | `docs/` | - | `PLAN.md` (design), `ENGINE_NOTES.md` (engine gaps and workarounds) |
 
 ### Adding content

@@ -27,6 +27,25 @@ above, but these still need a real session:
 4. HUD layout at real window sizes (the UI is only render-checked in a fake VM).
 5. The hidden-chat-line HUD channel (below) under heavy chat.
 
+## Released builds have no asset sync (engine bug)
+
+The engine's release workflows (`.github/workflows/build_linux.yml`, `build_windows.yml`,
+`build_macos.yml` at `3cc9104` / `v0.1.2`) configure with `-DVB_WITH_LUA=ON -DVB_WITH_NET=ON` but
+not `-DVB_WITH_COMPRESSION=ON`, which defaults to `OFF`. Without it `assetsync::build_manifest`
+returns `kDisabled`, the server skips asset sync without logging anything, and a joining client
+gets no pack files at all. Seen in play:
+
+- `ui/*.lua` never loads, so `player:open_ui` logs `ui.open: 'bp:menu' was never defined via
+  ui.define` (same for `bp:store`, `bp:almanac`, ...).
+- No HUD: the engine draws chat and the hotbar only through the pack's `ui.define_hud`, so chat
+  replies (`!world`, `!help`) and picked-up drops are invisible.
+- No textures: every pack block falls back to `WHITE` in `render/texture_atlas.cpp`, so worlds
+  look white (the flat ground itself is by design).
+
+Engine fix: add `-DVB_WITH_COMPRESSION=ON` to the three distribution builds (the automation job in
+`build_linux.yml` already has it), and log a warning when the manifest is disabled. Until then,
+singleplayer (`.dev/tools/play_local.sh`) works because it reads `ui/` and textures from disk.
+
 ## Gaps and workarounds
 
 | Gap | Effect | Workaround in the pack | Engine change that would remove it |
@@ -41,7 +60,7 @@ above, but these still need a real session:
 | `vb.world.raycast` and `Player:punch` only hit **solid** blocks | shrubs (walk-through) could not be punched, wrenched or spliced | `lib/ray.lua` marches the ray in Lua; shrubs are broken with `player:break_block`, everything else with `player:punch` | a `raycast` option to include non-solid blocks |
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
-| `vb pack dev` cannot pass `--insecure-skip-auth` | local play needs Keycloak or `vb host` | `vb host --pack . -- --insecure-skip-auth` | a `--insecure` flag on `vb pack dev` |
+| `--insecure-skip-auth` is compiled out of released builds; `vb pack dev` cannot pass it either | local multiplayer needs Keycloak | `.dev/tools/play_local.sh` plays singleplayer on a copy of the pack without `auth.lua`; custom builds can use `vb host --pack . -- --insecure-skip-auth` | a dev-only auth bypass for `vb pack dev` |
 
 ## Notes on engine behaviour the pack depends on
 

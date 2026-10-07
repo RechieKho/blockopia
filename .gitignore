@@ -8,3 +8,5 @@ world/
 ops/keycloak/.env
 # Local server config
 server.toml
+# Local singleplayer copy made by .dev/tools/play_local.sh
+.dev/local/
