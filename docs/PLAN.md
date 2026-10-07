@@ -201,9 +201,12 @@ statistics over 100k simulated breaks match `balance.lua` (test in `tests/drops_
 
 - **Plant:** use a seed on the top face of a solid block with air above it. This places a shrub
   block at stage 0 and saves `shrubs[pos] = {species, planted_at, planter, spliced=false}`.
-- **Growth time:** `grow_seconds(R)`. The default is Growtopia's `R^3 + 30*R`, scaled by
-  `balance.grow_scale`, because 3D worlds have more space and this needs playtesting. The current
-  stage is worked out from `now - planted_at`, so no per-shrub timer runs. A sweep every
+- **Growth time depends on rarity: the rarer the species, the longer it grows.**
+  `grow_seconds(R) = balance.grow_scale * (R^3 + 30*R)` (Growtopia's curve). It rises steeply
+  with R, so a common block such as Dirt (R=1) is ready in about 30 s, while a spliced rare
+  species takes hours. `tests/farm_test.lua` checks that `grow_seconds` strictly increases with
+  rarity, and `grow_scale` only stretches or shrinks the whole curve. The current stage is worked
+  out from `now - planted_at`, so no per-shrub timer runs. A sweep every
   `balance.shrub_sweep_s` updates the stage block only for shrubs near online players.
 - **Harvest:** punching a ripe shrub breaks it and drops
   `random(1, max(1, 5 - floor(R / 40)))` blocks of its species, plus a seed roll with `p_seed`
@@ -277,24 +280,26 @@ meet; name collisions are handled deterministically (test in `tests/worldname_te
 
 ## Phase 7: Ownership with locks
 
-There is no "world lock". Instead there are lock tiers, and the largest one, the **Grand Lock**,
-claims a whole 1024 × 1024 world cell.
+There is no "world lock". Instead there are lock tiers. Every lock's area is centred on the lock
+block itself. The largest one, the **Grand Lock**, always covers a fixed 1024 × 1024 area.
 
 | Lock        | Area (X × Z, all heights)                                                       | Adjustable              | Coin price |
 | ----------- | ------------------------------------------------------------------------------- | ----------------------- | ---------- |
 | Small Lock  | up to 10 × 10, centred on the lock                                              | yes (smaller square)    | 50         |
 | Big Lock    | up to 48 × 48, centred on the lock                                              | yes                     | 200        |
 | Huge Lock   | up to 200 × 200, centred on the lock                                            | yes                     | 500        |
-| Grand Lock  | **exactly 1024 × 1024, centred on the world centre** (the whole cell it is placed in) | **no**                  | ~20,000    |
+| Grand Lock  | **exactly 1024 × 1024, centred on the lock**                                    | **no**                  | ~20,000    |
 
 All values live in `data/locks.lua` and are tunable.
 
 - **Regions:** axis-aligned boxes in X and Z covering every height. A spatial index uses
   1024-sized buckets (each lock touches at most 4 buckets), so the protection check is a
-  constant-time bucket lookup followed by a box test.
+  constant-time bucket lookup followed by a box test. A lock's area does not follow world-cell
+  borders: a Grand Lock usually spans parts of up to four named-world cells.
 - **Placement rules:**
   - A new region may not overlap any region owned by someone else.
-  - A Grand Lock needs the cell to have no foreign locks.
+  - A Grand Lock needs its full 1024 × 1024 area to be free of foreign locks. Before placing,
+    the client shows the outline and any lock that would block it.
   - Inside your own Grand Lock you may place smaller locks to give out sub-areas. The innermost
     lock decides access, but the Grand Lock owner keeps admin rights.
   - Inside someone else's lock, only its owner and its admins may place locks.
@@ -307,8 +312,8 @@ All values live in `data/locks.lua` and are tunable.
   size (except for the Grand Lock); shows the region outline.
 - **Removing a lock:** only the owner can break their lock, and only once no foreign sub-locks
   are left inside it. The lock item goes back to the owner.
-- A Grand Lock makes its owner the world owner shown on the warp screen, and lets them set the
-  Main Door.
+- Whoever owns the lock covering a world's centre is shown as that world's owner on the warp
+  screen and can set its Main Door.
 
 **Exit:** non-members cannot change a locked area; overlap and nesting rules are enforced
 (`tests/locks_test.lua`); locks survive restarts.
@@ -379,11 +384,8 @@ identities.
 
 ## Decisions to confirm
 
-1. **Grand Lock area:** this plan reads "1024 × 1024 of the world ranging from the center" as
-   *the whole named-world cell, centred on the world's coordinate*. The other reading is *centred
-   on the lock block*; this changes only `lib/locks.lua`.
-2. **Rarity → seed chance direction:** the plan assumes rarer blocks drop seeds *less* often.
-3. **Growth speed:** the plan uses the Growtopia formula with a global `grow_scale` multiplier;
-   playtesting decides the multiplier.
-4. **Keycloak path (A/B/C):** decided by the Phase 0 findings on the engine's auth and HTTP
+1. **Rarity → seed chance direction:** the plan assumes rarer blocks drop seeds *less* often.
+2. **Growth speed:** growth time rises with rarity using the Growtopia curve; playtesting decides
+   the overall `grow_scale` multiplier.
+3. **Keycloak path (A/B/C):** decided by the Phase 0 findings on the engine's auth and HTTP
    support.
