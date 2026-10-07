@@ -88,8 +88,9 @@ phases can be built and tested before Keycloak is ready.
 
 1. **Item registry** (`data/items.lua`, `lib/registry.lua`, `blocks/00_items.lua`)
    - Item fields: `key`, `name`, `kind` (`block | seed | shrub | lock | tool | vending | ...`),
-     `rarity` (1-200), `punches` (maps to `max_damage`), `texture`, `seedless` (e.g. bedrock),
-     `breakable`.
+     `rarity` (1-200), `punches` (maps to `max_damage`), `texture`,
+     `seed_chance` (0-1, chance the block drops its seed when broken; `0` for bedrock, locks and
+     machines), `breakable`.
    - Each breakable block of rarity R automatically gets a seed item and shrub growth-stage
      blocks (for example `sapling`, `growing`, `ripe`). The order is defined by the data table, so
      it stays stable.
@@ -176,12 +177,13 @@ reward.
   reach for each player.
 - **Rewards** (`lib/drops.lua`, all tunable in `data/balance.lua`, with R as the rarity). Each
   roll is independent:
-  - **Seed:** `p_seed = clamp(0.30 - 0.0013 * R, 0.04, 0.30)`. The rarer the block, the less
-    often it drops its seed.
+  - **Seed:** `p_seed = item.seed_chance`, set for each block in `data/items.lua`. Designers
+    choose it per block, so a common block can still be stingy with seeds or a rare one generous.
+    The registry check requires every breakable block to set it and keeps it within [0, 1].
   - **Block:** `p_block = clamp(0.25 - 0.001 * R, 0.05, 0.25)`.
   - **Coins:** with `p_coin = 0.6`, you get `floor(R / 5) + random(0, ceil(R / 10))`, at least
     1. The rarer the block, the more coins.
-  - Blocks with `seedless = true` (bedrock, locks, machines) never drop seeds.
+  - Blocks with `seed_chance = 0` (bedrock, locks, machines) never drop seeds.
 - **Dropped items** (`entities/drop.lua`): a small spinning item, picked up by anyone within
   about 1.5 blocks, merged with matching nearby drops, and removed after 10 minutes. Coins drop
   as a coin entity. If the engine has no custom entities, rewards go straight into the
@@ -209,7 +211,7 @@ statistics over 100k simulated breaks match `balance.lua` (test in `tests/drops_
   out from `now - planted_at`, so no per-shrub timer runs. A sweep every
   `balance.shrub_sweep_s` updates the stage block only for shrubs near online players.
 - **Harvest:** punching a ripe shrub breaks it and drops
-  `random(1, max(1, 5 - floor(R / 40)))` blocks of its species, plus a seed roll with `p_seed`
+  `random(1, max(1, 5 - floor(R / 40)))` blocks of its species, plus a seed roll with the species' `seed_chance`
   and coins at half the block rate. Punching an unripe shrub destroys it and drops nothing; the
   UI warns you with a "not ripe" tooltip on the first punch.
 - **Inspect:** using the Wrench on a shrub shows the species, its parents if spliced, and the
@@ -384,8 +386,7 @@ identities.
 
 ## Decisions to confirm
 
-1. **Rarity → seed chance direction:** the plan assumes rarer blocks drop seeds *less* often.
-2. **Growth speed:** growth time rises with rarity using the Growtopia curve; playtesting decides
+1. **Growth speed:** growth time rises with rarity using the Growtopia curve; playtesting decides
    the overall `grow_scale` multiplier.
-3. **Keycloak path (A/B/C):** decided by the Phase 0 findings on the engine's auth and HTTP
+2. **Keycloak path (A/B/C):** decided by the Phase 0 findings on the engine's auth and HTTP
    support.
