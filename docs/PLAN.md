@@ -9,6 +9,47 @@ This document splits the work into phases. Each phase ships something you can pl
 
 ---
 
+## Implementation status
+
+All phases below are implemented in this repository. What is verified and what is not is spelled
+out in `docs/ENGINE_NOTES.md`: the pack lints clean with the real engine and the real server loads
+and ticks it, but nothing has been played with a real client or Keycloak.
+
+| Phase | Where |
+| --- | --- |
+| 0 Engine check | `docs/ENGINE_NOTES.md` |
+| 1 Foundations | `data/items.lua`, `lib/registry.lua`, `blocks/00_items.lua`, `game/store.lua`, `game/accounts.lua`, `game/inventory.lua`, `ui/hud.lua` |
+| 2 Keycloak | `auth.lua`, `ops/keycloak/`, `game/session.lua`, `game/accounts.lua` |
+| 3 Breaking, drops, coins | `lib/drops.lua`, `game/breaking.lua`, `game/actions.lua`, `worldgen.lua`, `biomes/meadow.lua` |
+| 4 Farming | `lib/farm.lua`, `game/farm.lua` |
+| 5 Splicing | `lib/splice.lua`, `data/splices.lua`, `game/almanac.lua`, `ui/almanac.lua` |
+| 6 Named worlds | `lib/worldname.lua`, `game/worlds.lua`, `ui/warp.lua` |
+| 7 Locks | `lib/locks.lua`, `game/locks.lua`, `game/placing.lua`, `ui/lock.lua` |
+| 8 Economy | `game/shop.lua`, `game/vending.lua`, `game/trade.lua`, `lib/market.lua`, `lib/trade.lua`, `game/ledger.lua` |
+| 9 Hardening | `game/moderation.lua`, `game/ui_events.lua` (validation, rate limit), `.dev/tools/balance_sim.lua`, `.github/workflows/ci.yml` |
+
+### Where the build differs from the plan below
+
+- **Wrench on a player** is `!trade <name>` / `!trade accept`: the engine can only target blocks.
+- **Fist** does not exist: an empty hand punches. The wrench is a normal inventory item.
+- **Backpack upgrades** are not sold: the engine inventory has a fixed size.
+- **Main Door / starter platform** are not built. `!setspawn` lets the owner of the lock covering a
+  world's centre move its arrival point. Terrain is the same flat meadow everywhere.
+- **Bedrock floor:** blocks at or below `floor_y` (1) cannot be broken or built on. A `bp:bedrock`
+  block is registered but the generator does not place it.
+- **Dropped items and coins:** drops use the engine's item drops (no custom entity). Coins go
+  straight to the account balance.
+- **Inventory:** the engine's, with a per-account snapshot because the engine does not save it.
+- **Seeds can be planted only on the top face** of a block; shrubs are broken with
+  `player:break_block` because the engine's punch ignores non-solid blocks.
+- **Moderation:** bans apply at the next join (the engine has no kick); `!removelock` clears a lock
+  without returning the item.
+- **Balance:** `coin_chance` is 0.12 and the punch cooldown 0.4 s, so a small lock takes about six
+  minutes of punching dirt and a grand lock about 37 hours. Terrain is endless, so mining is not
+  capped; treat the numbers as a first pass.
+
+---
+
 ## 0. Ground rules for every phase
 
 - **Two VMs (AGENTS.md rule 1).** Game logic and all state live in the server VM. `ui/` only

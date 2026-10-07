@@ -1,0 +1,37 @@
+# Keycloak + Postgres for local development and as a starting point for production.
+#   cp .env.example .env     (then change the passwords)
+#   docker compose up -d
+# Keycloak imports realm-blockopia.json on first start. Admin console: http://localhost:8080
+# For production put Keycloak behind TLS (an https issuer is required for anything but localhost)
+# and replace `start-dev` with `start` plus the hostname/proxy settings from the Keycloak docs.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - keycloak-db:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    command: start-dev --import-realm
+    depends_on:
+      - postgres
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./realm-blockopia.json:/opt/keycloak/data/import/realm-blockopia.json:ro
+
+volumes:
+  keycloak-db:

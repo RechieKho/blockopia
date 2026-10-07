@@ -1,0 +1,17 @@
+# Example server.toml for hosting Blockopia. Copy to server.toml (it is git-ignored by the engine's
+# own convention; keep real values out of the repository).
+content_pack = "."          # run from the pack directory, or point at it
+max_players = 32
+tick_rate = 20
+persist_world = true
+world_dir = "world"
+autosave_interval_seconds = 60.0
+max_connections_per_ip = 4
+max_messages_per_second = 60.0
+motd = "Welcome to Blockopia"
+
+# Sign-in is mandatory because the pack ships an auth.lua. These override the issuer and client
+# of auth.lua for this deployment without touching the pack.
+[auth]
+issuer = "https://id.example.com/realms/blockopia"
+client_id = "blockopia-game"
