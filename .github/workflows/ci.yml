@@ -1,0 +1,20 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+      - name: Unit and integration tests (mock engine)
+        run: lua5.4 .dev/tests/run.lua
+      - name: Balance report
+        run: lua5.4 .dev/tools/balance_sim.lua
+      # `vb pack check --json --strict` needs the engine CLI; add a step here once the engine is
+      # installable in CI (see docs/ENGINE_NOTES.md).

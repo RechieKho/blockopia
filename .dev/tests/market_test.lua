@@ -1,0 +1,35 @@
+local M = require("lib.market")
+
+local function machine()
+	return { item = 5, stock = 20, bundle = 10, price = 3, till = 0 }
+end
+
+test("a purchase moves stock and coins", function()
+	local m = machine()
+	local items, cost = M.sell(m, 1, 10)
+	eq(items, 10)
+	eq(cost, 3)
+	eq(m.stock, 10)
+	eq(m.till, 3)
+end)
+
+test("failed purchases change nothing", function()
+	local m = machine()
+	local items, why = M.sell(m, 1, 2)
+	eq(items, nil)
+	truthy(why)
+	eq(m.stock, 20)
+	eq(m.till, 0)
+	eq((M.sell(m, 3, 100)), nil, "more than the stock")
+	eq((M.sell(m, 0, 100)), nil)
+	eq((M.sell(m, 1.5, 100)), nil)
+	eq((M.sell({ item = 0, stock = 0, bundle = 1, price = 1, till = 0 }, 1, 5)), nil, "not set up")
+end)
+
+test("terms are validated", function()
+	truthy(M.validate_terms(1, 5, 1000))
+	falsy(M.validate_terms(0, 5, 1000))
+	falsy(M.validate_terms(1, 0, 1000))
+	falsy(M.validate_terms(1, 1001, 1000))
+	falsy(M.validate_terms(1, 2.5, 1000))
+end)
