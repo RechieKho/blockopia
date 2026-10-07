@@ -1,0 +1,60 @@
+local ray = require("lib.ray")
+
+local function world(blocks)
+	return function(x, y, z)
+		return blocks[x .. "," .. y .. "," .. z] or 0
+	end
+end
+
+test("a ray hits the first block and reports the face it entered through", function()
+	local get = world({ ["5,0,0"] = 1, ["8,0,0"] = 1 })
+	local hit = ray.cast(get, 0.5, 0.5, 0.5, 1, 0, 0, 10)
+	eq(hit.x, 5)
+	eq(hit.y, 0)
+	eq(hit.nx, -1)
+	eq(hit.ny, 0)
+end)
+
+test("rays in every direction", function()
+	local get = world({ ["0,5,0"] = 1, ["0,-3,0"] = 1, ["0,0,4"] = 1, ["-6,0,0"] = 1 })
+	local up = ray.cast(get, 0.5, 0.5, 0.5, 0, 1, 0, 10)
+	eq(up.y, 5)
+	eq(up.ny, -1)
+	local down = ray.cast(get, 0.5, 0.5, 0.5, 0, -1, 0, 10)
+	eq(down.y, -3)
+	eq(down.ny, 1)
+	local south = ray.cast(get, 0.5, 0.5, 0.5, 0, 0, 1, 10)
+	eq(south.z, 4)
+	eq(south.nz, -1)
+	local west = ray.cast(get, 0.5, 0.5, 0.5, -1, 0, 0, 10)
+	eq(west.x, -6)
+	eq(west.nx, 1)
+end)
+
+test("diagonal rays find blocks off the axes", function()
+	local get = world({ ["3,3,0"] = 1 })
+	local hit = ray.cast(get, 0.5, 0.5, 0.5, 1, 1, 0, 10)
+	eq(hit.x, 3)
+	eq(hit.y, 3)
+end)
+
+test("nothing beyond the maximum distance, and nothing in an empty world", function()
+	local get = world({ ["9,0,0"] = 1 })
+	eq(ray.cast(get, 0.5, 0.5, 0.5, 1, 0, 0, 5), nil)
+	truthy(ray.cast(get, 0.5, 0.5, 0.5, 1, 0, 0, 10))
+	eq(ray.cast(world({}), 0.5, 0.5, 0.5, 1, 0.2, 0.1, 20), nil)
+	eq(ray.cast(get, 0.5, 0.5, 0.5, 0, 0, 0, 10), nil, "zero direction")
+end)
+
+test("negative coordinates work", function()
+	local get = world({ ["-4,-1,-1"] = 1 })
+	local hit = ray.cast(get, -0.5, -0.5, -0.5, -1, 0, 0, 10)
+	eq(hit.x, -4)
+	eq(hit.nx, 1)
+end)
+
+test("walk-through blocks are hit like any other", function()
+	-- the point of the module: it returns whatever is non-air, solid or not
+	local get = world({ ["2,0,0"] = 7 })
+	eq(ray.cast(get, 0.5, 0.5, 0.5, 1, 0, 0, 5).x, 2)
+end)
