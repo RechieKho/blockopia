@@ -100,7 +100,7 @@ local function ui_vm(opts)
 		end,
 	}
 	env._G = env
-	local files = __listdir("ui")
+	local files = M.listdir("ui")
 	table.sort(files)
 	for _, f in ipairs(files) do
 		if f:match("%.lua$") then

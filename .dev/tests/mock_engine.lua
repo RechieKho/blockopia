@@ -190,6 +190,25 @@ function M.fire_decision(event, ...)
 	return nil
 end
 
+-- File names in a directory. tests/run.py provides __listdir (lupa blocks io.popen); plain Lua
+-- falls back to `ls`.
+function M.listdir(dir)
+	if __listdir then
+		local out = {}
+		for _, name in ipairs(__listdir(dir)) do
+			out[#out + 1] = name
+		end
+		return out
+	end
+	local names = {}
+	local p = io.popen('ls "' .. dir .. '" 2>/dev/null')
+	for line in p:lines() do
+		names[#names + 1] = line
+	end
+	p:close()
+	return names
+end
+
 -- ---- loading ---------------------------------------------------------------------------
 
 -- opts.db / opts.storage carry saved state across a "restart"; opts.set_pos adds Player:set_pos.
@@ -320,16 +339,7 @@ function M.load(opts)
 		return f()
 	end
 	local function list(dir)
-		local names = {}
-		if __listdir then
-			names = __listdir(dir)
-		else
-			local p = io.popen('ls "' .. dir .. '" 2>/dev/null')
-			for line in p:lines() do
-				names[#names + 1] = line
-			end
-			p:close()
-		end
+		local names = M.listdir(dir)
 		local files = {}
 		for _, line in ipairs(names) do
 			if line:match("%.lua$") then
