@@ -31,7 +31,7 @@ This document splits the work into phases. Each phase ships something you can pl
 pack.toml
 init.lua                  -- wires game/* modules to vb.on(...) events; loaded last
 blocks/00_items.lua       -- registers every block/seed/shrub/lock from data/items.lua
-entities/drop.lua         -- floating dropped-item entity
+auth.lua                  -- Keycloak sign-in settings read by the engine
 biomes/blockopia.lua      -- Growtopia-style layers (bedrock / lava / rock / dirt)
 data/items.lua            -- the item table: id order, rarity, punches, texture, kind
 data/splices.lua          -- splice recipes {a, b} -> child
@@ -39,8 +39,8 @@ data/balance.lua          -- every tunable number in one place
 data/locks.lua            -- lock tiers
 data/store.lua            -- what the coin store sells
 lib/*.lua                 -- pure logic, no vb (unit-tested)
-game/*.lua                -- engine adapters: accounts, auth, inventory, punch, farm, locks, ...
-ui/*.lua                  -- HUD, inventory, sign-in, warp, lock, vending, trade, store screens
+game/*.lua                -- engine adapters: accounts, punch, farm, locks, ...
+ui/*.lua                  -- HUD, warp, lock, vending, trade, store screens
 textures/                 -- block, seed and shrub art
 tests/*.lua               -- plain Lua tests for lib/*
 ops/keycloak/             -- docker-compose + realm export for the auth server
@@ -51,40 +51,38 @@ files in subfolders run only when something `require`s them.
 
 ---
 
-## Phase 0: Engine capability spike (gate)
+## Phase 0: Engine capabilities (checked)
 
-There are no `vb` CLI or `.vb/lua` stubs in this repo yet. Before writing any gameplay, run
-`vb pack types` and use the stubs and `vb docs` to fill in this table. Each question has a
-fallback if the answer is no.
+Checked against the engine source (`VoxelBrowser/voxel_browser`, commit `3cc9104`): its Lua
+reference (`docs/lua-reference/`) and auth guide (`docs/auth.md`). Run `vb pack types` to copy
+the same stubs into `.vb/lua/`.
 
-| Need                                     | Question to verify                                                       | Fallback if missing                                                   |
-| ---------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Punch / break hooks                      | Is there a cancellable `block_break` / `block_damage` event that gives the player and position? | Required. Ask for an engine feature.                                    |
-| Custom drops                             | Can I turn off default drops and spawn my own?                            | Put drops straight into the inventory.                                |
-| Place hook                               | Is there a cancellable `block_place` event that says which item was placed? | Placement from a custom UI hotbar plus `vb.world.raycast`.             |
-| Engine inventory                         | Does the engine have an inventory or hotbar I can control?                | Own inventory (Phase 1) with a HUD hotbar.                            |
-| Persistence                              | Is there a storage/db API? (`.gitignore` lists `storage.json` and `db/`.)  | Required.                                                             |
-| Wall-clock time                          | `os` is removed. Is there a server Unix-time function?                    | Count game ticks and save an offset (growth pauses while the server is down). |
-| Timers                                   | Repeating timers or a tick event?                                         | Required.                                                             |
-| Outbound HTTP (server VM)                | Is there an HTTP client, and can I allowlist hosts?                       | See the Phase 2 fallback. This is the biggest risk.                   |
-| `player_join(name, login)`               | What is `login`? Does the engine already have pluggable or OIDC auth?     | Device flow in Phase 2.                                               |
-| Teleport, freeze, kick                   | `player:set_pos`, a movement lock, `player:kick`?                         | Freeze by teleporting guests back each tick.                          |
-| World bounds / float precision           | Largest safe coordinate?                                                  | Shrink the world-name grid (Phase 5).                                 |
-| Per-block state                          | Is there block metadata?                                                  | Store a state table keyed by position, plus one block id per growth stage. |
-| Entities                                 | Custom entity with a texture, a pickup radius and despawn?               | Put drops straight into the inventory.                                |
-| UI                                       | Text input, lists, buttons, QR or image widgets?                          | Chat commands (`!warp NAME`, ...).                                    |
+| Need                      | Engine has                                                                                       | Plan                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Break hooks               | `block_break_begin`, `block_break` (vetoable), `block_break_tick`, `block_health_tick`, per-block `on_break` | Use them. Lock protection vetoes `block_break` / `block_place`.                           |
+| Punches and healing       | `max_damage` per block; `vb.combat.set_params{heal_after_seconds, heal_interval_seconds, punch_cooldown_seconds}` | Use the engine's punches and healing. No own damage table.                                |
+| Drops                     | `vb.world.spawn_item_drop(pos, item, count)`; `pickup_radius`, `item_lifetime_seconds` per block | Use engine drops. Still to check in a quick test: whether the engine's own drop can be turned off. |
+| Place hook                | `block_place` (vetoable), `Player:place_block`, `Player:get_held_item`                          | Use them.                                                                                |
+| Inventory                 | Engine inventory: `get_inventory`, `give`, `take` (all-or-nothing), `max_stack`; `client.inventory()` in the UI | Use the engine inventory. No custom inventory.                                            |
+| Persistence               | `vb.storage` (one JSON file) and `vb.db.get/set/delete` (written at once, **no key listing**)    | `vb.db` for per-account and per-object data; keep explicit index keys for listing.       |
+| Wall-clock time           | **None.** Only `tick(dt)`, `vb.after`, `vb.every`                                                | Count game time from `tick` and save it. Shrubs do not grow while the server is off. Optional engine request: `vb.time()`. |
+| Outbound HTTP             | **None**                                                                                         | Not needed: the engine does Keycloak sign-in itself (Phase 2).                           |
+| Sign-in                   | **Built in.** `auth.lua` with `provider = "keycloak"`; `Player:get_login()` gives `{subject, name, claims}` | **Option A chosen.** See Phase 2.                                                       |
+| Teleport                  | `Entity:set_pos` exists, but `Player` has **no `set_pos`**. A death can return a respawn `pos`.  | **Engine gap; blocks warping (Phase 6).** Ask for `Player:set_pos` in the engine.        |
+| Kick / ban                | Vetoing `player_join` keeps an account out. The engine itself kicks a second session of the same account. | Bans keyed on `login.subject`.                                                           |
+| Per-block state           | None                                                                                             | State table in `vb.db` keyed by position, plus one block id per growth stage.            |
+| Entities                  | `vb.register_entity`, `vb.world.spawn`                                                           | Only for extras; drops use the engine's item drops.                                      |
+| UI                        | `ui.define`, `ui.define_hud`, `ui.send_event`, `client.*`                                        | Screens as planned; chat commands as backup.                                             |
+| Limits                    | 20M instructions, 250 ms and 64 MB per callback                                                  | Split big sweeps over several ticks.                                                     |
 
-**Deliverables:** `docs/ENGINE_NOTES.md` with the filled-in table, plus a throwaway branch with a
-proof of concept for each yes/no. **Exit criteria:** every "Required" row says yes, and the
-Keycloak path is chosen (A, B or C in Phase 2).
+**Still to test in a quick prototype:** whether the engine's own drop on break can be turned
+off, and the largest safe coordinate (for the world-name grid in Phase 6).
 
 ---
 
-## Phase 1: Foundations: data model, persistence, accounts interface, inventory
+## Phase 1: Foundations: data model, persistence, accounts
 
-**Goal:** a typed item registry, saved player state, and an inventory with a HUD. No real auth
-yet: an `AccountProvider` interface with a **dev provider** (account id = player name) so later
-phases can be built and tested before Keycloak is ready.
+**Goal:** an item registry, saved player state, and coins on the HUD.
 
 1. **Item registry** (`data/items.lua`, `lib/registry.lua`, `blocks/00_items.lua`)
    - Item fields: `key`, `name`, `kind` (`block | seed | shrub | lock | tool | vending | ...`),
@@ -97,72 +95,77 @@ phases can be built and tested before Keycloak is ready.
    - Validation at load time: keys are unique, rarity is in range, textures exist, ids have not
      moved.
 2. **Persistence** (`game/store.lua`)
-   - Wraps the engine storage. Namespaces: `accounts/<id>`, `worlds/`, `locks/`, `shrubs/`,
-     `vending/`, `meta` (with `schema_version`, migrated on load).
-   - In-memory cache, marked dirty on change, flushed on a timer and when a player leaves or the
-     server shuts down.
+   - Wraps `vb.db`. Key prefixes: `account:<subject>`, `world:<name>`, `lock:<id>`,
+     `shrub:<x>,<y>,<z>`, `vending:<x>,<y>,<z>`, plus `meta` (with `schema_version`, migrated on
+     load).
+   - `vb.db` cannot list keys, so each kind keeps an index key (for example `locks:index`, a list
+     of lock ids) that is updated together with the object.
+   - Saved game time (`meta.game_seconds`) is advanced from the `tick` event and saved every
+     few seconds. Everything time-based (growth) uses it.
 3. **Accounts** (`game/accounts.lua`)
-   - `Account { id, display_name, coins, inventory, backpack_slots, stats, roles }`.
-   - `session[player] -> account_id`. Gameplay code asks `accounts.of(player)` and never sees the
-     player name, so swapping in Keycloak later changes only the provider.
-4. **Inventory** (`lib/inventory.lua`, `game/inventory.lua`, `ui/hud.lua`, `ui/inventory.lua`)
-   - Slots with stacks of up to 200. Starts with 16 slots; upgrades are bought with coins (a coin
-     sink).
-   - The Fist and the Wrench are always present and cannot be dropped.
-   - The server pushes inventory diffs to the client UI. The client sends `select_slot`,
-     `drop_item`, `trash_item`.
+   - `Account { subject, display_name, coins, stats, groups }`, keyed by the Keycloak `subject`
+     from `player:get_login()`, never by the player name.
+   - `accounts.of(player)` is the only way gameplay code finds an account.
+   - Development: `--insecure-skip-auth` makes `get_login()` return `nil`; the accounts module
+     then uses `dev:<player name>` as the key. That flag does not exist in release builds.
+4. **Inventory and HUD** (`ui/hud.lua`)
+   - Items use the engine inventory (`give`, `take`, `get_inventory`, `max_stack = 200`).
+   - Coins are an account balance, not an inventory item, so they never fill a slot. The HUD
+     shows them; the server sends the balance when it changes.
 
-**Exit:** items show up in the inventory, survive a server restart, and the HUD shows coins and
-the hotbar. `tests/` cover inventory maths and registry validation.
+**Exit:** a test block can be broken and placed, coins show on the HUD, and the balance survives
+a server restart. `tests/` cover registry validation.
 
 ---
 
-## Phase 2: Accounts with Keycloak
+## Phase 2: Accounts with Keycloak (engine sign-in, option A)
 
-**Goal:** every gameplay action needs a signed-in Keycloak account. Keycloak handles
-registration, passwords, email checks and 2FA; the pack never sees a password.
+**Goal:** every player is signed in with a Keycloak account before they join. Keycloak handles
+registration, passwords, email checks and 2FA; neither the pack nor the server sees a password,
+and tokens never reach Lua.
+
+**How it works:** a pack with an `auth.lua` at its root makes sign-in mandatory. When a player
+connects, the game opens their system browser on the Keycloak login page. After they sign in,
+the server checks the ID token before sending any world data. The pack then reads
+`player:get_login()`. Rejoining later opens no browser, because the client keeps a refresh
+token. Every 15 minutes the engine asks the client to prove the sign-in again, so a disabled or
+signed-out account is removed within about 17 minutes.
+
+### `auth.lua`
+```lua
+return {
+	provider     = "keycloak",
+	display_name = "Blockopia",
+	issuer       = "https://<keycloak-host>/realms/blockopia",
+	client_id    = "blockopia-game",
+	scopes       = { "openid", "profile" },
+	name_claim   = "preferred_username",
+	claims       = { "groups" },
+}
+```
+Staging and production use the same pack: `server.toml` `[auth] issuer = ...` and
+`client_id = ...` override the values above.
 
 ### Keycloak setup (`ops/keycloak/`)
-- `docker-compose.yml`: Keycloak + Postgres. `realm-blockopia.json` is imported on start so the
-  setup can be reproduced.
-- Realm `blockopia`; user self-registration on; `preferred_username` unique and used as the
-  in-game display name.
-- Client `blockopia-game`: **public** client, with **OAuth 2.0 Device Authorization Grant** on
-  and the standard and implicit flows off. A public client needs no secret, so nothing secret
-  ships in the pack.
-- Realm roles `bp-moderator` and `bp-admin` map to in-game permissions (kick, mute, inspecting
-  or removing locks).
+- `docker-compose.yml`: Keycloak + Postgres, with `realm-blockopia.json` imported on start so the
+  setup can be reproduced. The server needs outbound HTTPS to Keycloak.
+- Realm `blockopia`, self-registration on, `preferred_username` as the in-game name.
+- Client `blockopia-game`: OpenID Connect, **client authentication off** (public, no secret in
+  the pack), **standard flow on**, everything else off, redirect URI `http://127.0.0.1/*`, PKCE
+  method **S256**.
+- Groups `moderators` and `admins`, with a *Group Membership* mapper (claim `groups`, added to
+  the ID token, full group path off). Moderator and admin powers come from
+  `login.claims.groups or {}`; Keycloak leaves the claim out for a user in no group.
 
-### Integration path (picked in Phase 0)
-- **A. Engine-native OIDC (preferred, if `login` in `player_join` supports it):** the engine
-  checks the Keycloak token when the player connects and gives the pack a verified `sub`. The
-  pack only maps `sub` to an account.
-- **B. Device flow from the server VM (needs outbound HTTP):**
-  1. A player joins as a **guest**. Guests are frozen at the hub spawn, cannot punch or place,
-     and the sign-in screen opens (`player:open_ui("signin", ctx)`).
-  2. The server POSTs `.../protocol/openid-connect/auth/device` and gets `user_code` and
-     `verification_uri_complete`. The UI shows the code and URL (and a QR code if the UI can draw
-     images).
-  3. A server timer polls the token endpoint at the `interval` Keycloak returns, handling
-     `authorization_pending`, `slow_down` and `expired_token`.
-  4. On success the server calls `userinfo` with the access token, which gives `sub`,
-     `preferred_username` and roles. That call checks the token, so the server never needs to
-     verify a JWT signature in Lua.
-  5. The server binds the session to an account, creating it on first sign-in. Tokens are thrown
-     away; nothing is stored on disk.
-- **C. Neither is available:** an engine change is needed, either a server-only, allowlisted
-  `vb.http` or native OIDC. A sidecar service alone is not enough, because the sandbox has no
-  `io` or socket to talk to it. Raise this with the engine first. It blocks Phase 2 but not
-  Phases 3-8, which keep running on the dev provider.
+### Pack side (`auth.lua`, `game/accounts.lua`)
+- `player_join(name, login)`: refuse banned `login.subject`s; create the account on first join.
+- `login_changed`: refresh the stored display name and groups.
+- Names are not unique ids: two accounts wanting `alex` become `alex` and `alex#2`. Access
+  lists, trades and bans store the `subject` and only show the name.
+- The engine already stops a second session of the same account.
 
-### Rules
-- One live session per account: signing in again kicks the older session.
-- The dev provider stays available only behind a `pack.toml`/server config flag that is off by
-  default.
-- Rate-limit sign-in attempts for each connection.
-
-**Exit:** you can register in Keycloak, sign in from the game, and your inventory follows your
-Keycloak account across player names and reconnects. A guest cannot change the world.
+**Exit:** you can register in Keycloak, sign in from the game, and your coins and land follow
+your Keycloak account across reconnects. A Keycloak user in `moderators` gets moderator commands.
 
 ---
 
@@ -171,10 +174,9 @@ Keycloak account across player names and reconnects. A guest cannot change the w
 **Goal:** the core loop. You punch a block a set number of times, it breaks, and you get a
 reward.
 
-- **Punching:** the engine's `max_damage` gives each block its number of punches. Damage heals if
-  you stop punching for `balance.heal_seconds` (about 6 s). Use the engine's healing if it has
-  it; otherwise keep a `damage[pos] = {hits, last_hit}` table. The server limits punch rate and
-  reach for each player.
+- **Punching:** the engine's `max_damage` gives each block its number of punches. Damage heals
+  through `vb.combat.set_params{heal_after_seconds = 6}`, and `punch_cooldown_seconds` limits
+  punch rate. The engine already checks reach.
 - **Rewards** (`lib/drops.lua`, all tunable in `data/balance.lua`, with R as the rarity). Each
   roll is independent:
   - **Seed:** `p_seed = item.seed_chance`, set for each block in `data/items.lua`. Designers
@@ -184,10 +186,9 @@ reward.
   - **Coins:** with `p_coin = 0.6`, you get `floor(R / 5) + random(0, ceil(R / 10))`, at least
     1. The rarer the block, the more coins.
   - Blocks with `seed_chance = 0` (bedrock, locks, machines) never drop seeds.
-- **Dropped items** (`entities/drop.lua`): a small spinning item, picked up by anyone within
-  about 1.5 blocks, merged with matching nearby drops, and removed after 10 minutes. Coins drop
-  as a coin entity. If the engine has no custom entities, rewards go straight into the
-  inventory.
+- **Dropped items:** `vb.world.spawn_item_drop` spawns the block and seed drops, which anyone
+  nearby picks up. Each block sets `pickup_radius` and `item_lifetime_seconds` (about 10 minutes).
+- **Coins** go straight onto the breaker's balance, with a "+N coins" message.
 - **Placing:** placing a block uses up one from the selected stack. The server refuses if you do
   not have the item, if the target is out of reach, or (from Phase 6) if a lock protects the
   spot.
@@ -208,7 +209,8 @@ statistics over 100k simulated breaks match `balance.lua` (test in `tests/drops_
   with R, so a common block such as Dirt (R=1) is ready in about 30 s, while a spliced rare
   species takes hours. `tests/farm_test.lua` checks that `grow_seconds` strictly increases with
   rarity, and `grow_scale` only stretches or shrinks the whole curve. The current stage is worked
-  out from `now - planted_at`, so no per-shrub timer runs. A sweep every
+  out from `now - planted_at`, where both use the saved game time from Phase 1, so no per-shrub
+  timer runs. Shrubs do not grow while the server is off. A sweep every
   `balance.shrub_sweep_s` updates the stage block only for shrubs near online players.
 - **Harvest:** punching a ripe shrub breaks it and drops
   `random(1, max(1, 5 - floor(R / 40)))` blocks of its species, plus a seed roll with the species' `seed_chance`
@@ -218,7 +220,7 @@ statistics over 100k simulated breaks match `balance.lua` (test in `tests/drops_
   time left.
 
 **Exit:** the full plant → wait → harvest loop works and survives server restarts (because it
-uses saved wall-clock timestamps).
+uses the saved game time).
 
 ---
 
@@ -267,6 +269,9 @@ one "world".
   Another name with the same hash takes the next free cell along a fixed probe sequence, so a
   name always gives the same coordinate once registered. Cell (0,0) is reserved for the hub,
   `START`.
+- **Warping needs an engine change:** the engine cannot move a player yet (`Player` has no
+  `set_pos`). Add `Player:set_pos` to the engine before this phase. A workaround through death and
+  a respawn position exists, but it shows a death and is not worth building.
 - **Warping:** the `!warp NAME` command and the `ui/warp.lua` screen (recent worlds, owner, lock
   status). Arrival point: the owner's **Main Door** if they set one, otherwise the highest solid
   block at the centre (found with `vb.world.raycast`), plus brief spawn protection.
@@ -374,19 +379,19 @@ player. Trades cannot duplicate items, even when a player disconnects mid-trade 
 ## Order of work and dependencies
 
 ```
-P0 spike ──► P1 foundations ──► P3 punch/drops ──► P4 farming ──► P5 splicing
+P0 (done) ─► P1 foundations ──► P3 punch/drops ──► P4 farming ──► P5 splicing
                  │                    │
                  ├──► P2 Keycloak     └──► P6 worlds ──► P7 locks ──► P8 economy ──► P9
-                 │    (in parallel; uses the dev provider until it lands)
+                 │    (in parallel; development uses --insecure-skip-auth)
+                 └──► engine: Player:set_pos (needed before P6)
 ```
 
-P2 can run alongside P3-P6 because all gameplay goes through the `AccountProvider` interface.
-P2 must be finished before any public server and before P8, because real currency needs real
-identities.
+P2 is small now that the engine signs players in, and can run alongside P3-P6. It must be
+finished before any public server and before P8, because real currency needs real identities.
 
 ## Decisions to confirm
 
 1. **Growth speed:** growth time rises with rarity using the Growtopia curve; playtesting decides
    the overall `grow_scale` multiplier.
-2. **Keycloak path (A/B/C):** decided by the Phase 0 findings on the engine's auth and HTTP
-   support.
+2. **Growth while the server is off:** the engine has no clock, so shrubs pause while the server
+   is down. Adding `vb.time()` to the engine would let them keep growing.
