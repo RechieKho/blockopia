@@ -70,10 +70,9 @@ def seed(key, color):
 
 
 def shrub(key, color, stage):
-    # Fully opaque on purpose: the engine draws pack blocks in its opaque pass with no alpha cutout,
-    # so a transparent texel would hide the terrain behind it (it shows the sky instead). A shrub
-    # is a leafy bush filling the block: leaves get denser as it grows, and a ripe one shows fruit
-    # in the species colour.
+    # A leafy bush filling the block: leaves get denser as it grows, and a ripe one shows fruit in
+    # the species colour. Fully opaque: engines before 0.1.5 had no alpha cutout, so clear texels
+    # showed holes of sky through the terrain behind.
     rng = random.Random("%s_s%d" % (key, stage))
     shadow = (28, 74, 32)
     leaf = ((92, 178, 84), (70, 156, 64), (58, 138, 56))[stage]

@@ -1,7 +1,7 @@
 # Engine notes
 
 What Blockopia needs from the Voxel Browser engine, what was verified, and where the pack works
-around a gap. Required engine: **0.1.4** (`pack.toml`). Last checked against `e4776f1` (`v0.1.4`),
+around a gap. Required engine: **0.1.5** (`pack.toml`). Last checked against `1c77229` (`v0.1.5`),
 built locally with networking, asset sync and the engine's e2e automation harness.
 
 ## Verified against the real engine
@@ -10,7 +10,7 @@ built locally with networking, asset sync and the engine's e2e automation harnes
   passes, and no `vb.*` call appears in `ui/` or the reverse.
 - The real server starts with the pack, runs 400 ticks without script
   errors, and persists `vb.storage.block_order`.
-- End to end on 0.1.4 (`.dev/tools/e2e_join.py`: a real server and real headless clients over UDP):
+- End to end on 0.1.5 (`.dev/tools/e2e_join.py`: a real server and real headless clients over UDP):
   a cold-cache client joins after the pack has written `vb.db`, receives `ui/` and textures and no
   `db/` files; the HUD shows coins; `!world` answers in chat; `!menu`, `!store` and `!almanac` open;
   breaking grass and dirt drops the block and its seed, which are picked up by walking onto them;
@@ -32,7 +32,7 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 3. HUD layout at larger window sizes (only checked at 720 x 360).
 4. The hidden-chat-line HUD channel (below) under heavy chat.
 
-## Fixed in engine 0.1.3 and 0.1.4
+## Fixed in engine 0.1.3 to 0.1.5
 
 - **Asset sync in release builds.** 0.1.2 release builds were compiled without
   `VB_WITH_COMPRESSION`, so the server skipped asset sync without a word and joining clients got
@@ -48,6 +48,13 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
   pack's first `vb.db` write (the game clock, every 10 s) the manifest was stale, so later
   cold-cache joins failed with "asset transfer failed (hash mismatch or size cap)". 0.1.4 excludes
   `db/`, `storage.json` and the world directory, and re-hashes files before serving them.
+- **0.1.5: what the pack asked for.** A world per hosted pack, and saves that record their blocks
+  (a mismatched pack is refused instead of loading another pack's terrain untextured); alpha
+  cutout for clear texels; `ui.close{ capture_mouse = true }` (every Close/OK button and the warp
+  loading screen use it, through `bp_ui.back_to_game`); `ui.close()` from a screen's own render
+  (the loading screen closes itself again, the HUD command line is gone); `player_leave` handles
+  that keep the player's name (the pack's "find who left" fallback is gone). Shrubs keep their
+  opaque bush textures: they read well and avoid depending on the cutout.
 
 ## Gaps and workarounds
 
@@ -62,12 +69,7 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 | `vb.world.raycast` and `Player:punch` only hit **solid** blocks | shrubs (walk-through) could not be punched, wrenched or spliced | `lib/ray.lua` marches the ray in Lua; shrubs are broken with `player:break_block`, everything else with `player:punch` | a `raycast` option to include non-solid blocks |
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
 | Rendering uses float coordinates far from the origin | blocks jittered near ±131 000 (the first map) | the map is 64 x 64 worlds of 256 blocks, so everything stays within ±8192 | camera-relative rendering |
-| Custom keybinds (E, Esc) are sent while the chat box or a text field is open | typing "e" opens the menu | every screen opens through `ui_events.open`, so the server ignores E while one of our screens is open (until its `close` event); `ui/hud.lua` reports `client.chat_open()` changes as a `hud_chat` event, so E is also ignored while the chat box is open | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
-| `vb host` / `vb pack dev` share one `default` instance world across packs, and saved chunks are not checked against the block registry | chunks another pack saved load as its blocks (untextured base blocks and water at spawn) | README: delete `servers/default/world`, or use a named `vb server` instance | a world per pack (or a registry stamp in the save that refuses or regenerates on mismatch) |
-| Pack blocks are drawn in the opaque pass with no alpha cutout (only the base pack's leaves/water count as transparent, from a hard-coded colour table) | a transparent texel hides the terrain behind it, so see-through shrubs showed holes of sky | shrub textures are fully opaque leafy bushes (`.dev/tools/gen_textures.py`) | `discard` below an alpha threshold in the chunk shader, or a `cutout`/`transparent` flag on `vb.register_block` |
-| Closing a screen does not recapture the mouse | after closing the menu the player must click once more before looking around | none: `ui/*.lua` has no mouse-capture call | recapture when the last screen closes (if it was captured before), or `client.capture_mouse()` |
-| `player_leave` fires after the connection is dropped: on its handle `get_name()` is `""` and `get_pos()` throws | leave cleanup keyed by name never ran: the player stayed "online" (timer errors "entity is gone" every 5 s, rejoin refused) and the autosave overwrote their saved inventory with an empty one | `session.on_leave_event` finds the online players whose entity is gone and cleans each up under its stored name; `accounts.each_online` skips players that are gone | keep the name on the leave handle (the runtime still has `player_names` then) |
-| A screen calling `ui.close()` from its own render function crashes the client | the warp loading screen could not close itself | the server sends the HUD a one-shot command line (`@@bp\|cmd=close_loading\|id=..`, `hud.command`), and the HUD's render closes the screen | allow `ui.close()` during render (defer it to after the frame) |
+| Custom keybinds (E, Esc) are sent while the chat box or a text field is open | typing "e" opens the menu | every screen opens through `ui_events.open`, so the server ignores E while one of our screens is open (until its `close` event); `ui/hud.lua` reports `client.chat_open()` changes as a `hud_chat` event, so E is also ignored while the chat box is open (still needed on 0.1.5) | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
 
 ## Notes on engine behaviour the pack depends on

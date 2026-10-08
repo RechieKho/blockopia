@@ -4,7 +4,6 @@
 -- The server resends it every few seconds, because the client keeps only the latest chat lines.
 local accounts = require("game.accounts")
 local worlds = require("game.worlds")
-local store = require("game.store")
 
 local M = {}
 
@@ -37,13 +36,6 @@ function M.push_all()
 	for _, player in accounts.each_online() do
 		M.push(player)
 	end
-end
-
--- Sends the HUD a one-shot command (ui/hud.lua runs each id once), e.g. "close_loading".
-local sent = 0
-function M.command(player, cmd)
-	sent = sent + 1
-	player:send_message(string.format("%scmd=%s|id=%d_%d", M.MARKER, clean(cmd), math.floor(store.now() * 1000), sent))
 end
 
 -- Chat lines from players must never be mistaken for server data.

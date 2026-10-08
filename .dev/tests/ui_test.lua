@@ -47,6 +47,7 @@ end
 -- `client` (no `vb`), exactly like the real one.
 local function ui_vm(opts)
 	opts = opts or {}
+	local vm_state = {}
 	local screens, hud = {}, nil
 	local sent = {}
 	local env = {
@@ -63,8 +64,9 @@ local function ui_vm(opts)
 		send_event = function(kind, value)
 			sent[#sent + 1] = { kind = kind, value = value }
 		end,
-		close = function()
+		close = function(opts)
 			sent[#sent + 1] = { kind = "close" }
+			vm_state.closed_with = opts or {}
 		end,
 	}
 	env.client = {
@@ -108,7 +110,8 @@ local function ui_vm(opts)
 			assert(load(src, "@ui/" .. f, "t", env))()
 		end
 	end
-	return { screens = screens, hud = function() return hud end, sent = sent, env = env }
+	vm_state.screens, vm_state.hud, vm_state.sent, vm_state.env = screens, function() return hud end, sent, env
+	return vm_state
 end
 
 local function render(vm, name, ctx)
@@ -306,27 +309,26 @@ test("the hud tells the server when the chat box opens and closes", function()
 	eq(vm.sent[3].value.open, false)
 end)
 
-test("the hud closes the loading screen on the server's command, once", function()
+test("the loading screen closes itself and recaptures the mouse when the warp is done", function()
 	setup()
-	local layout = render(ui_vm(), "bp:loading", { world = "FARM" })
+	local vm = ui_vm()
+	local layout = render(vm, "bp:loading", { world = "FARM" })
 	truthy(find(layout, "text").text:find("FARM", 1, true))
-	local hud_line = require("game.hud")
-	local sent_line
-	hud_line.command({ send_message = function(_, text) sent_line = text end }, "close_loading")
-	local vm = ui_vm({ chat = { "@@bp|coins=5|world=X|owner=", sent_line } })
-	local state = {}
-	local function closes()
-		local n = 0
-		for _, e in ipairs(vm.sent) do
-			if e.kind == "close" then
-				n = n + 1
-			end
-		end
-		return n
+	eq(#vm.sent, 0)
+	layout = render(vm, "bp:loading", { done = true })
+	eq(#layout.widgets, 0)
+	eq(vm.sent[#vm.sent].kind, "close")
+	eq(vm.closed_with.capture_mouse, true)
+end)
+
+test("close buttons hand the mouse back to the game", function()
+	setup()
+	local vm = ui_vm()
+	for _, name in ipairs({ "bp:menu", "bp:store", "bp:almanac", "bp:warp", "bp:notice" }) do
+		local layout = render(vm, name, { items = {}, recent = {}, species = {}, recipes = {} })
+		local button = find(layout, "close") or find(layout, "ok")
+		vm.closed_with = nil
+		button.on_click()
+		eq(vm.closed_with and vm.closed_with.capture_mouse, true, name)
 	end
-	local hud = check_widgets("hud", vm.hud()(state))
-	eq(closes(), 1)
-	eq(find(hud, "coins").text, "5 coins", "a command line is not mistaken for the data line")
-	vm.hud()(state)
-	eq(closes(), 1, "each command runs once")
 end)

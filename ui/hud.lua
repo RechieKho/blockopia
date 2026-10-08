@@ -9,7 +9,7 @@ local function parse(log)
 	for i = #log, 1, -1 do
 		local line = log[i]
 		local at = line:find(MARKER, 1, true)
-		if at and not line:find("cmd=", at, true) then
+		if at then
 			local data = {}
 			for key, value in line:sub(at + #MARKER):gmatch("([%w_]+)=([^|]*)") do
 				data[key] = value
@@ -69,25 +69,6 @@ local function chat(widgets, screen, k)
 	end
 end
 
--- One-shot commands from the server ("@@bp|cmd=close_loading|id=..."), each run once. Closing the
--- loading screen happens here because a screen cannot safely close itself from its own render.
-local function run_commands(log, state)
-	state.done_ids = state.done_ids or {}
-	for _, line in ipairs(log) do
-		local at = line:find(MARKER, 1, true)
-		if at then
-			local cmd = line:match("cmd=([%w_]+)", at)
-			local id = line:match("id=([%w_]+)", at)
-			if cmd and id and not state.done_ids[id] then
-				state.done_ids[id] = true
-				if cmd == "close_loading" then
-					ui.close()
-				end
-			end
-		end
-	end
-end
-
 -- Tells the server when the chat box opens or closes. The client still reports the E keybind while
 -- the player types into the chat box, and only this VM can see that the box is open.
 local function report_chat(state)
@@ -100,7 +81,6 @@ end
 
 ui.define_hud(function(state)
 	report_chat(state)
-	run_commands(client.chat_log(), state)
 	local widgets = {}
 	local screen = client.screen_size()
 	local k = bp_ui.scale()

@@ -27,18 +27,15 @@ vb pack dev                             # host with restart-on-save and open the
 .dev/tools/play_local.sh
 ```
 
-Needs Voxel Browser **0.1.4** or newer (`pack.toml` enforces it). 0.1.2 shipped without asset
-sync (no UI or textures for joining clients), and on 0.1.3 a client that joined after the pack's
-first `vb.db` write failed with "asset transfer failed". See `docs/ENGINE_NOTES.md`.
+Needs Voxel Browser **0.1.5** or newer (`pack.toml` enforces it): earlier releases lack asset sync
+in release builds (0.1.2), break cold joins once the pack writes `vb.db` (0.1.3), and lose the
+player's name on leave, crash when a screen closes itself and draw see-through textures with holes
+(0.1.4). See `docs/ENGINE_NOTES.md`.
 
-**Untextured blocks around spawn?** `vb pack dev` and `vb host` always use the engine's `default`
-server instance, whose world save is shared by every pack it has hosted, and the engine does not
-check which pack saved a chunk. Chunks saved by another pack (or an older Blockopia map) come back
-as that pack's blocks. Stop the server and delete the instance's world:
-`~/.local/share/voxel_browser/servers/default/world` (Linux),
-`%LOCALAPPDATA%\voxel_browser\servers\default\world` (Windows) or
-`~/Library/Application Support/voxel_browser/servers/default/world` (macOS). For a world of its
-own, use a named instance: `vb server new blockopia --pack .` then `vb server start blockopia`.
+Since 0.1.5, `vb pack dev` and `vb host --pack .` keep a world per pack
+(`<vb data>/servers/default/worlds/blockopia-<hash>/`), and a server refuses a world saved by
+another pack's blocks. A world saved by an older engine is accepted and recorded as it is: if you
+see another pack's untextured terrain or old flat ground around spawn, delete that world folder.
 
 `play_local.sh` copies the pack without `auth.lua` to `.dev/local/` and starts singleplayer on the
 copy (run it again after editing). Accounts are then keyed `dev:<player name>`.

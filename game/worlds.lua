@@ -174,8 +174,9 @@ function M.check_arrivals()
 			a.last_y = p.y
 			if a.steady >= balance.warp_steady_seconds or now - a.started >= balance.warp_timeout_seconds then
 				arriving[name] = nil
-				if require("game.ui_events").current_screen(player) == "bp:loading" then
-					require("game.hud").command(player, "close_loading")
+				local ui_events = require("game.ui_events")
+				if ui_events.current_screen(player) == "bp:loading" then
+					ui_events.open(player, "bp:loading", { done = true })
 				end
 			end
 		end
