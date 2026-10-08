@@ -70,3 +70,10 @@ test("cell geometry", function()
 	eq(gx, -128)
 	eq(gz, 127)
 end)
+
+test("the map stays small enough for steady float rendering", function()
+	local balance = require("data.balance")
+	-- float32 still resolves ~1/1000 of a block at 8192; jitter was visible near 131072
+	truthy(balance.world_grid * balance.world_cell_size // 2 <= 8192)
+	eq(require("data.locks").grand.size, balance.world_cell_size, "a grand lock claims one world")
+end)

@@ -40,6 +40,10 @@ def ground_below(client):
     return x, y - 1, z
 
 
+def inv_count(client, item):
+    return sum(s["count"] for s in client.state().get("inventory", []) if s["item"] == item)
+
+
 def punch_until_air(client, server, pos, tries=8):
     client.look_at((pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5))
     for _ in range(tries):
@@ -90,22 +94,16 @@ try:
     expect(alice).to_have_ui_open("bp:almanac")
     alice.ui("close").click()
 
-    step("break grass then dirt (drop rolls forced to succeed)")
+    step("dig straight down twice (drop rolls forced to succeed)")
     server.run_lua("math.random = function(a, b) if a then return a end return 0 end")
-    x, y, z = ground_below(alice)
-    target = (x + 2, y, z)
-    print("   surface block:", server.block_at(target))
-    assert punch_until_air(alice, server, target), "surface block did not break"
-    expect(alice).not_.to_have_inventory("bp:grass", 1, timeout=1)  # 2 blocks away: out of pickup range
-    alice.walk_to((target[0] + 0.5, None, target[2] + 0.5), tolerance=0.15)  # walk onto the drop
-    expect(alice).to_have_inventory("bp:grass", 1, timeout=10)
-    expect(alice).to_have_inventory("bp:grass_seed", 1, timeout=10)
-    below = (target[0], target[1] - 1, target[2])  # the dirt under the hole
-    print("   block below:", server.block_at(below))
-    assert punch_until_air(alice, server, below), "dirt did not break"
-    alice.walk_to((below[0] + 0.5, None, below[2] + 0.5), tolerance=0.15)  # into the hole, onto the drop
-    expect(alice).to_have_inventory("bp:dirt", 9, timeout=10)  # 8 starting dirt + 1 drop
-    expect(alice).to_have_inventory("bp:dirt_seed", 4, timeout=10)  # 3 starting seeds + 1
+    for _ in range(2):
+        below = ground_below(alice)  # the block under Alice's feet: she falls onto its drop
+        name = server.block_at(below)
+        have, seeds = inv_count(alice, name), inv_count(alice, name + "_seed")
+        print("   breaking", name, "at", below)
+        assert punch_until_air(alice, server, below), name + " did not break"
+        expect(alice).to_have_inventory(name, have + 1, timeout=10)
+        expect(alice).to_have_inventory(name + "_seed", seeds + 1, timeout=10)
     print("   drops picked up")
 
     step("!warp TESTWORLD")
@@ -115,7 +113,10 @@ try:
     time.sleep(1)
     after = alice.feet
     print("   moved from", [round(v) for v in before], "to", [round(v) for v in after])
-    assert abs(after[0] - before[0]) + abs(after[2] - before[2]) > 1000
+    cell = 256  # balance.world_cell_size
+    assert (math.floor(after[0] / cell), math.floor(after[2] / cell)) != \
+        (math.floor(before[0] / cell), math.floor(before[2] / cell)), "still in the same world cell"
+    assert max(abs(after[0]), abs(after[2])) <= 8192, "outside the map"
     expect(alice).to_have_loaded_chunks(8, timeout=30)
     expect(alice).to_be_on_ground(timeout=30)
     gx, gy, gz = ground_below(alice)

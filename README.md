@@ -8,10 +8,11 @@ as a content pack in Lua.
 - **Plant seeds** to grow shrubs that drop their block when ripe. The rarer the species, the longer
   it takes: `grow_scale * (R^3 + 30 R)` seconds.
 - **Splice** a second seed onto a growing shrub to make a rarer species (`data/splices.lua`).
-- **Worlds are names.** `!warp NAME` hashes the name to one 1024 x 1024 cell of a single big map, so
-  the same name always leads to the same place.
+- **Worlds are names.** `!warp NAME` hashes the name to one 256 x 256 cell of a 64 x 64 grid
+  (4096 worlds, all within ±8192 blocks of the origin), so the same name always leads to the same
+  place. Terrain is rolling hills of grass or sand over dirt and rock.
 - **Locks** claim land: small, big and huge locks are resizable squares centred on the lock; the
-  **Grand Lock** claims exactly 1024 x 1024 around itself and cannot be resized. There is no world
+  **Grand Lock** claims exactly one world's size (256 x 256) around itself and cannot be resized. There is no world
   lock.
 - **Shops:** a coin store, vending machines (only inside land you have locked) and player trades.
 - **Accounts** are Keycloak accounts, signed in by the engine before you join.
@@ -73,7 +74,7 @@ without `auth.lua`). Accounts are then keyed `dev:<player name>`.
 | --- | --- | --- |
 | `auth.lua` | engine | Keycloak settings |
 | `blocks/00_items.lua` | server | registers every block from `data/items.lua` |
-| `biomes/`, `worldgen.lua` | server | flat meadow world with lava pockets |
+| `biomes/`, `worldgen.lua` | server | rolling hills (meadow and dunes biomes), lava, gravel and clay pockets |
 | `init.lua` | server | wires engine events to `game/*` |
 | `game/*.lua` | server | rules that need the engine: accounts, farming, locks, worlds, vending, trade, ... |
 | `lib/*.lua` | server | pure rules with no `vb.*`: drops, growth, splicing, world names, lock regions, ray march, trade state |

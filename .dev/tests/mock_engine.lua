@@ -226,7 +226,7 @@ function M.load(opts)
 	M.blocks, M.block_by_id, M.aim, M.next_id = {}, {}, nil, 1
 	M.db = opts.db or {}
 	M.storage = opts.storage and floatify(opts.storage) or {}
-	M.pipeline, M.keybinds = nil, {}
+	M.pipeline, M.keybinds, M.biomes = nil, {}, {}
 	M.auth_required = opts.auth_required or false
 
 	vb = {
@@ -263,7 +263,9 @@ function M.load(opts)
 			M.block_by_id[id] = def
 			return id
 		end,
-		register_biome = function() end,
+		register_biome = function(def)
+			M.biomes[#M.biomes + 1] = def
+		end,
 		register_keybind = function(name)
 			M.keybinds[name] = true
 		end,
@@ -298,6 +300,14 @@ function M.load(opts)
 		noise = {
 			constant = function(v)
 				return { constant = v }
+			end,
+			value = function(frequency)
+				assert(frequency == nil or type(frequency) == "number", "vb.noise.value takes a number")
+				return { value = frequency or 1 }
+			end,
+			fbm = function(def)
+				assert(type(def) == "table" and def.source, "vb.noise.fbm needs a source")
+				return { fbm = def }
 			end,
 		},
 		worldgen = {

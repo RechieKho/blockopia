@@ -14,8 +14,8 @@ built locally with networking, asset sync and the engine's e2e automation harnes
   a cold-cache client joins after the pack has written `vb.db`, receives `ui/` and textures and no
   `db/` files; the HUD shows coins; `!world` answers in chat; `!menu`, `!store` and `!almanac` open;
   breaking grass and dirt drops the block and its seed, which are picked up by walking onto them;
-  `!warp` teleports with `set_pos` to a new world ~46 000 blocks out, whose chunks load and whose
-  ground is `bp:grass`; a second cold-cache client joins later. A windowed client under Xvfb
+  `!warp` teleports with `set_pos` to a new world in another cell, whose chunks load and whose
+  ground is generated terrain; a second cold-cache client joins later. A windowed client under Xvfb
   draws the textured ground, HUD, hotbar and chat after the warp.
 - API shapes the pack calls were read from the engine source: `player:punch/break_block/place_block`,
   `give/take/get_inventory/get_held_item`, `player_death` decisions (`heal`, `pos`, `message`),
@@ -28,10 +28,9 @@ built locally with networking, asset sync and the engine's e2e automation harnes
 The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real session:
 
 1. Joining with Keycloak (`auth.lua`), including `login.claims.groups`.
-2. Warping to the far edge of the map (float precision at ±131 000; ~46 000 works).
-3. Whether non-air-but-non-solid blocks (shrubs) render and can be broken as expected.
-4. HUD layout at larger window sizes (only checked at 720 x 360).
-5. The hidden-chat-line HUD channel (below) under heavy chat.
+2. Whether non-air-but-non-solid blocks (shrubs) render and can be broken as expected.
+3. HUD layout at larger window sizes (only checked at 720 x 360).
+4. The hidden-chat-line HUD channel (below) under heavy chat.
 
 ## Fixed in engine 0.1.3 and 0.1.4
 
@@ -62,6 +61,8 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 | No kick | bans only apply at the next join | `player_join` veto on banned `login.subject` | `Player:kick(reason)` (`Player:remove()` is a logged no-op) |
 | `vb.world.raycast` and `Player:punch` only hit **solid** blocks | shrubs (walk-through) could not be punched, wrenched or spliced | `lib/ray.lua` marches the ray in Lua; shrubs are broken with `player:break_block`, everything else with `player:punch` | a `raycast` option to include non-solid blocks |
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
+| Rendering uses float coordinates far from the origin | blocks jittered near ±131 000 (the first map) | the map is 64 x 64 worlds of 256 blocks, so everything stays within ±8192 | camera-relative rendering |
+| Custom keybinds (E, Esc) are sent while the chat box is open | typing "e" opens the menu | none possible: the server only sees key state | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
 
 ## Notes on engine behaviour the pack depends on

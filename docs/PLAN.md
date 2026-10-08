@@ -34,7 +34,7 @@ and ticks it, but nothing has been played with a real client or Keycloak.
 - **Fist** does not exist: an empty hand punches. The wrench is a normal inventory item.
 - **Backpack upgrades** are not sold: the engine inventory has a fixed size.
 - **Main Door / starter platform** are not built. `!setspawn` lets the owner of the lock covering a
-  world's centre move its arrival point. Terrain is the same flat meadow everywhere.
+  world's centre move its arrival point. Terrain is rolling hills (meadow and dunes biomes) with lava, gravel and clay pockets.
 - **Bedrock floor:** blocks at or below `floor_y` (1) cannot be broken or built on. A `bp:bedrock`
   block is registered but the generator does not place it.
 - **Dropped items and coins:** drops use the engine's item drops (no custom entity). Coins go
@@ -298,14 +298,14 @@ uses the saved game time).
 
 ## Phase 6: Named worlds as coordinates
 
-The game runs on one continuous world, split into a grid of **1024 × 1024 cells**. Each cell is
+The game runs on one continuous world, split into a grid of **256 × 256 cells**. Each cell is
 one "world".
 
 - **Name rules:** names are turned into uppercase `A-Z0-9`, 1-24 characters, with a blocklist.
 - **Name → cell** (`lib/worldname.lua`): the FNV-1a 32-bit hash of the name picks a cell in a
   `G × G` grid centred on the origin, with G limited by the engine's safe coordinate range from
-  Phase 0 (for example G = 256, so ±131k blocks). The world centre is
-  `(gx * 1024 + 512, gz * 1024 + 512)`.
+  Phase 0: G = 64, so ±8192 blocks (at ±131k, the first design, blocks visibly jittered). The
+  world centre is `(gx * 256 + 128, gz * 256 + 128)`.
 - **Collisions:** the first name to reach a cell claims it in a saved `worlds/` registry.
   Another name with the same hash takes the next free cell along a fixed probe sequence, so a
   name always gives the same coordinate once registered. Cell (0,0) is reserved for the hub,
@@ -327,14 +327,14 @@ meet; name collisions are handled deterministically (test in `tests/worldname_te
 ## Phase 7: Ownership with locks
 
 There is no "world lock". Instead there are lock tiers. Every lock's area is centred on the lock
-block itself. The largest one, the **Grand Lock**, always covers a fixed 1024 × 1024 area.
+block itself. The largest one, the **Grand Lock**, always covers a fixed 256 × 256 area (one world).
 
 | Lock        | Area (X × Z, all heights)                                                       | Adjustable              | Coin price |
 | ----------- | ------------------------------------------------------------------------------- | ----------------------- | ---------- |
 | Small Lock  | up to 10 × 10, centred on the lock                                              | yes (smaller square)    | 50         |
 | Big Lock    | up to 48 × 48, centred on the lock                                              | yes                     | 200        |
 | Huge Lock   | up to 200 × 200, centred on the lock                                            | yes                     | 500        |
-| Grand Lock  | **exactly 1024 × 1024, centred on the lock**                                    | **no**                  | ~20,000    |
+| Grand Lock  | **exactly 256 × 256 (one world), centred on the lock**                          | **no**                  | ~20,000    |
 
 All values live in `data/locks.lua` and are tunable.
 
@@ -344,7 +344,7 @@ All values live in `data/locks.lua` and are tunable.
   borders: a Grand Lock usually spans parts of up to four named-world cells.
 - **Placement rules:**
   - A new region may not overlap any region owned by someone else.
-  - A Grand Lock needs its full 1024 × 1024 area to be free of foreign locks. Before placing,
+  - A Grand Lock needs its full 256 × 256 area to be free of foreign locks. Before placing,
     the client shows the outline and any lock that would block it.
   - Inside your own Grand Lock you may place smaller locks to give out sub-areas. The innermost
     lock decides access, but the Grand Lock owner keeps admin rights.

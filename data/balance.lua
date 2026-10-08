@@ -34,13 +34,16 @@ return {
 	game_clock_save_seconds = 10.0,
 	inventory_save_seconds = 30.0,
 
-	-- Worlds: a G x G grid of 1024 x 1024 cells centred on the origin.
-	world_cell_size = 1024,
-	world_grid = 256,
+	-- Worlds: a G x G grid of 256 x 256 cells centred on the origin (4096 worlds). The whole map
+	-- stays within +-8192 blocks, where the engine's float rendering is still steady.
+	world_cell_size = 256,
+	world_grid = 64,
 	world_name_max = 24,
+	-- Terrain: rolling hills of world_ground_y +- world_hill_height.
 	world_ground_y = 64,
-	-- Players warp in at this height and fall onto the ground.
-	world_spawn_y = 100,
+	world_hill_height = 8,
+	-- Players warp in at this height (above the highest hill) and fall onto the ground.
+	world_spawn_y = 80,
 	hub_name = "START",
 	-- Blocks at or below this height cannot be broken (stands in for a bedrock floor).
 	floor_y = 1,

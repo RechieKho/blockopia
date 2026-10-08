@@ -1,4 +1,4 @@
--- Named worlds: every world name hashes to one 1024 x 1024 cell of the single big map.
+-- Named worlds: every world name hashes to one cell (balance.world_cell_size square) of the single map.
 local wn = require("lib.worldname")
 local store = require("game.store")
 local accounts = require("game.accounts")
@@ -10,6 +10,11 @@ local M = {}
 
 local G, CELL = balance.world_grid, balance.world_cell_size
 
+-- Saved under a key per map layout: cell indices mean nothing on a different grid.
+local LAYOUT = G .. "x" .. CELL
+local REGISTRY = "worlds:registry:" .. LAYOUT
+local SPAWN = "worlds:spawn:" .. LAYOUT .. ":"
+
 local by_name, by_cell, loaded = {}, {}, false
 
 local function ensure()
@@ -17,7 +22,7 @@ local function ensure()
 		return
 	end
 	loaded = true
-	local saved = store.get("worlds:registry") or {}
+	local saved = store.get(REGISTRY) or {}
 	for name, idx in pairs(saved) do
 		idx = math.floor(idx)
 		by_name[name] = idx
@@ -25,7 +30,7 @@ local function ensure()
 	end
 	if not by_name[balance.hub_name] then
 		wn.assign(balance.hub_name, by_name, by_cell, G, balance.hub_name)
-		store.set("worlds:registry", by_name)
+		store.set(REGISTRY, by_name)
 	end
 end
 
@@ -46,7 +51,7 @@ end
 
 -- Where players arrive in a world: the owner's chosen spawn, else above the world centre.
 function M.spawn_of(idx)
-	local custom = store.get("worlds:spawn:" .. idx)
+	local custom = store.get(SPAWN .. idx)
 	if custom then
 		return custom.x, custom.y, custom.z
 	end
@@ -92,7 +97,7 @@ function M.warp(player, raw_name)
 		return false
 	end
 	if is_new then
-		store.set("worlds:registry", by_name)
+		store.set(REGISTRY, by_name)
 	end
 	local acc = accounts.of(player)
 	if acc then
@@ -131,7 +136,7 @@ function M.set_spawn(player)
 		notify.say(player, "Only the owner of the lock covering the world's centre can set its spawn.")
 		return
 	end
-	store.set("worlds:spawn:" .. idx, { x = p.x, y = p.y + 1, z = p.z })
+	store.set(SPAWN .. idx, { x = p.x, y = p.y + 1, z = p.z })
 	notify.say(player, "Spawn point of " .. by_cell[idx] .. " moved here.")
 end
 
