@@ -2,7 +2,6 @@
 local accounts = require("game.accounts")
 local worlds = require("game.worlds")
 local ui_events = require("game.ui_events")
-local notify = require("game.notify")
 
 local M = {}
 
@@ -33,9 +32,7 @@ function M.on_ui_event(player, ctx, kind, value)
 		if #value.name > 64 then
 			return
 		end
-		if worlds.warp(player, value.name) then
-			notify.notice(player, "Warping", "Hold on...")
-		end
+		worlds.warp(player, value.name) -- shows the loading screen itself
 	end
 end
 

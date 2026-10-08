@@ -28,12 +28,7 @@ vb.action.set_params({ reach = balance.reach })
 
 -- Who may join, and who is ready.
 vb.on("player_join", session.on_join)
-vb.on("player_leave", function(player)
-	require("game.trade").on_leave(player)
-	ui_events.clear(player)
-	actions.forget(player)
-	session.on_leave(player)
-end)
+vb.on("player_leave", session.on_leave_event)
 
 -- Punching, placing, planting, menus.
 vb.on("player_input", actions.on_input)
@@ -90,6 +85,9 @@ vb.every(balance.inventory_save_seconds, function()
 end)
 vb.every(3.0, function()
 	hud.push_all()
+end)
+vb.every(balance.warp_check_seconds, function()
+	worlds.check_arrivals()
 end)
 
 print(string.format("[blockopia] loaded %d item types", #require("game.ids").species_order))

@@ -37,10 +37,50 @@ function M.touch(player)
 	return acc
 end
 
-function M.on_leave(player)
+-- Everything that has to happen when a player leaves.
+local function leave(player)
+	require("game.trade").on_leave(player)
+	require("game.ui_events").clear(player)
+	require("game.actions").forget(player)
+	require("game.worlds").forget(player)
 	pending[player:get_name()] = nil
 	notify.forget(player)
 	accounts.on_leave(player)
+end
+
+-- `player`, but get_name() answers `name`. Every other method goes to the real handle, which keeps
+-- its inventory until the leave event is over.
+local function named(player, name)
+	return setmetatable({}, {
+		__index = function(_, key)
+			if key == "get_name" then
+				return function()
+					return name
+				end
+			end
+			local value = player[key]
+			if type(value) == "function" then
+				return function(_, ...)
+					return value(player, ...)
+				end
+			end
+			return value
+		end,
+	})
+end
+
+-- player_leave handler. The engine fires it after dropping the connection, so get_name() on the
+-- handle returns "" (engine 0.1.4). Then the leaving player is found as the online player whose
+-- entity is gone, and cleaned up under the name we stored for them.
+function M.on_leave_event(player)
+	local name = player:get_name()
+	if name ~= "" then
+		leave(player)
+		return
+	end
+	for gone_name, handle in pairs(accounts.gone()) do
+		leave(named(handle, gone_name))
+	end
 end
 
 return M

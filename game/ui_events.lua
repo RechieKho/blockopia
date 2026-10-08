@@ -25,6 +25,11 @@ function M.screen_open(player)
 	return open_screens[player:get_name()] ~= nil
 end
 
+-- Name of the screen open on the player's client, or nil.
+function M.current_screen(player)
+	return open_screens[player:get_name()]
+end
+
 -- True while the player's chat box is open. Only the player's own client reports this, and it only
 -- decides whether E opens their own menu, so trusting it is harmless.
 function M.chatting(player)

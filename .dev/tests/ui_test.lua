@@ -305,3 +305,28 @@ test("the hud tells the server when the chat box opens and closes", function()
 	vm.hud()(state)
 	eq(vm.sent[3].value.open, false)
 end)
+
+test("the hud closes the loading screen on the server's command, once", function()
+	setup()
+	local layout = render(ui_vm(), "bp:loading", { world = "FARM" })
+	truthy(find(layout, "text").text:find("FARM", 1, true))
+	local hud_line = require("game.hud")
+	local sent_line
+	hud_line.command({ send_message = function(_, text) sent_line = text end }, "close_loading")
+	local vm = ui_vm({ chat = { "@@bp|coins=5|world=X|owner=", sent_line } })
+	local state = {}
+	local function closes()
+		local n = 0
+		for _, e in ipairs(vm.sent) do
+			if e.kind == "close" then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	local hud = check_widgets("hud", vm.hud()(state))
+	eq(closes(), 1)
+	eq(find(hud, "coins").text, "5 coins", "a command line is not mistaken for the data line")
+	vm.hud()(state)
+	eq(closes(), 1, "each command runs once")
+end)

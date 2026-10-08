@@ -44,6 +44,11 @@ return {
 	world_hill_height = 8,
 	-- Players warp in at this height (above the highest hill) and fall onto the ground.
 	world_spawn_y = 80,
+	-- The warp loading screen closes once the player has stood on the ground this long, checked
+	-- every warp_check_seconds, or after warp_timeout_seconds at the latest.
+	warp_check_seconds = 0.25,
+	warp_steady_seconds = 0.5,
+	warp_timeout_seconds = 15,
 	hub_name = "START",
 	-- Blocks at or below this height cannot be broken (stands in for a bedrock floor).
 	floor_y = 1,

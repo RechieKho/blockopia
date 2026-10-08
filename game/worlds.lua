@@ -16,6 +16,7 @@ local REGISTRY = "worlds:registry:" .. LAYOUT
 local SPAWN = "worlds:spawn:" .. LAYOUT .. ":"
 
 local by_name, by_cell, loaded = {}, {}, false
+local arriving = {} -- player name -> { started, last_y, steady } while the loading screen is up
 
 local function ensure()
 	if loaded then
@@ -116,6 +117,8 @@ function M.warp(player, raw_name)
 	local x, y, z = M.spawn_of(idx)
 	M.teleport(player, x, y, z)
 	notify.say(player, "Warping to " .. name .. (is_new and " (a brand new world!)" or "") .. "...")
+	require("game.ui_events").open(player, "bp:loading", { world = name })
+	arriving[player:get_name()] = { started = store.now(), steady = 0 }
 	return true
 end
 
@@ -150,6 +153,37 @@ function M.info(player)
 	local name = by_cell[idx] or "(unnamed wilderness)"
 	local owner = M.owner_name(idx)
 	return string.format("World %s%s", name, owner and (" - owned by " .. owner) or " - unclaimed")
+end
+
+-- Closes the loading screen of players who have landed: standing on a block at a steady height
+-- for balance.warp_steady_seconds, or after balance.warp_timeout_seconds whatever happens. Runs every
+-- balance.warp_check_seconds. The screen is only closed if it is still the one showing.
+function M.check_arrivals()
+	local now = store.now()
+	for _, player in accounts.each_online() do
+		local name = player:get_name()
+		local a = arriving[name]
+		if a then
+			local p = player:get_pos()
+			local ground = vb.world.get_block(math.floor(p.x), math.floor(p.y - 0.05), math.floor(p.z)) ~= 0
+			if ground and a.last_y and math.abs(p.y - a.last_y) < 0.01 then
+				a.steady = a.steady + balance.warp_check_seconds
+			else
+				a.steady = 0
+			end
+			a.last_y = p.y
+			if a.steady >= balance.warp_steady_seconds or now - a.started >= balance.warp_timeout_seconds then
+				arriving[name] = nil
+				if require("game.ui_events").current_screen(player) == "bp:loading" then
+					require("game.hud").command(player, "close_loading")
+				end
+			end
+		end
+	end
+end
+
+function M.forget(player)
+	arriving[player:get_name()] = nil
 end
 
 function M.list_recent(acc)

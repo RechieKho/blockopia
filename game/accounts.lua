@@ -85,8 +85,32 @@ function M.online(name)
 	return online[name]
 end
 
+-- False once the engine has dropped the player: their handle then throws on get_pos.
+function M.alive(player)
+	return (pcall(player.get_pos, player))
+end
+
+-- Online players the engine still has. A player whose entity is gone is skipped even before the
+-- leave cleanup has run (see session.on_leave_event), so timers never act on a departed player.
 function M.each_online()
-	return pairs(online)
+	local list = {}
+	for name, player in pairs(online) do
+		if M.alive(player) then
+			list[name] = player
+		end
+	end
+	return pairs(list)
+end
+
+-- Online players the engine has already dropped: name -> their stored handle.
+function M.gone()
+	local list = {}
+	for name, player in pairs(online) do
+		if not M.alive(player) then
+			list[name] = player
+		end
+	end
+	return list
 end
 
 function M.set_online(player)

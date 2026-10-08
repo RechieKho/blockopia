@@ -845,3 +845,73 @@ test("E does not open the menu while the chat box is open", function()
 	press_e()
 	eq(#a.ui_log, 2)
 end)
+
+test("the warp loading screen closes itself once the player has landed", function()
+	fresh()
+	local a = dev("alice")
+	local function closes()
+		local n = 0
+		for _, m in ipairs(a.messages) do
+			if m:find("cmd=close_loading", 1, true) then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	M.chat(a, "!warp landing")
+	eq(a.ui.name, "bp:loading")
+	eq(a.ui.ctx.world, "LANDING")
+	M.advance(2, 0.25) -- still falling: nothing under the player at the spawn height
+	eq(closes(), 0)
+	-- lands on the ground at the destination
+	local gx, gz = math.floor(a.x), math.floor(a.z)
+	M.world[gx .. "," .. 63 .. "," .. gz] = M.id("bp:grass")
+	a.y = 64
+	M.advance(0.25, 0.25)
+	eq(closes(), 0, "needs a steady height first")
+	M.advance(1, 0.25)
+	eq(closes(), 1, "the HUD is told to close the loading screen")
+	M.ui_event(a, "close", nil)
+	M.advance(20, 0.5)
+	eq(closes(), 1, "only once")
+end)
+
+test("the warp loading screen times out, and never closes another screen", function()
+	fresh()
+	local a = dev("alice")
+	local function closes()
+		local n = 0
+		for _, m in ipairs(a.messages) do
+			if m:find("cmd=close_loading", 1, true) then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	M.chat(a, "!warp nowhere")
+	eq(a.ui.name, "bp:loading")
+	M.advance(16, 0.5) -- never lands
+	eq(closes(), 1)
+	M.ui_event(a, "close", nil)
+	-- the player opens the menu while still loading: the menu stays
+	M.chat(a, "!warp elsewhere")
+	M.chat(a, "!menu")
+	M.advance(16, 0.5)
+	eq(a.ui.name, "bp:menu")
+	eq(closes(), 1, "no close command while another screen is showing")
+end)
+
+test("leaving saves the player even though the engine's leave handle has no name", function()
+	fresh()
+	local a, b = dev("alice"), dev("bob")
+	a:give({ item = M.id("bp:gold"), count = 7 })
+	account(a).coins = 345
+	M.leave(a) -- get_name() is "" and get_pos() throws, like the real engine
+	-- timers keep running: shrub sweep, inventory autosave, HUD, warp arrivals
+	M.advance(65, 0.5)
+	truthy(not require("game.accounts").online("alice"), "alice is no longer online")
+	local a2 = dev("alice")
+	eq(M.count(a2, "bp:gold"), 7, "inventory survived the leave and the autosave after it")
+	eq(account(a2).coins, 345)
+	truthy(M.count(b, "bp:dirt") > 0, "bob is untouched")
+end)

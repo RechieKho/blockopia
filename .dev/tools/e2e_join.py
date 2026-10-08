@@ -131,6 +131,8 @@ try:
     before = alice.feet
     alice.chat("!warp TESTWORLD")
     expect(alice).to_have_chat(regex="Warping to TESTWORLD")
+    expect(alice).to_have_ui_open("bp:loading")
+    expect(alice).not_.to_have_ui_open("bp:loading", timeout=20)  # closes itself once landed
     time.sleep(1)
     after = alice.feet
     print("   moved from", [round(v) for v in before], "to", [round(v) for v in after])

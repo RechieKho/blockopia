@@ -27,9 +27,13 @@ local Player = {}
 Player.__index = Player
 
 function Player:get_name()
-	return self.name
+	-- like the real engine: player_leave fires after the connection is dropped, so the name is gone
+	return self.gone and "" or self.name
 end
 function Player:get_pos()
+	if self.gone then
+		error("entity:get_pos(): entity is gone")
+	end
 	return { x = self.x, y = self.y, z = self.z }
 end
 function Player:get_login()
@@ -408,9 +412,13 @@ function M.join(name, login)
 	return p
 end
 
+-- Like the real engine (0.1.4): the connection is dropped first, then player_leave fires with a
+-- handle whose get_name() is "" and get_pos() throws; the inventory is erased afterwards.
 function M.leave(p)
+	p.gone = true
 	M.fire("player_leave", p)
 	M.players[p.name] = nil
+	p.slots = {}
 end
 
 -- opts: primary / secondary / menu booleans
