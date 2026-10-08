@@ -84,7 +84,7 @@ local function ui_vm(opts)
 			return opts.chat or {}
 		end,
 		chat_open = function()
-			return false
+			return opts.chat_open or false
 		end,
 		break_progress = function()
 			return opts.progress
@@ -284,4 +284,24 @@ test("the server's hud line parses the way the hud expects", function()
 	eq(fields.coins, "7")
 	eq(fields.world, "A_B_C")
 	eq(fields.owner, "o_w")
+end)
+
+test("the hud tells the server when the chat box opens and closes", function()
+	setup()
+	local opts = {}
+	local vm = ui_vm(opts)
+	local state = {}
+	vm.hud()(state)
+	eq(#vm.sent, 1)
+	eq(vm.sent[1].kind, "hud_chat")
+	eq(vm.sent[1].value.open, false)
+	vm.hud()(state)
+	eq(#vm.sent, 1, "nothing sent while the state is unchanged")
+	opts.chat_open = true
+	vm.hud()(state)
+	eq(vm.sent[2].kind, "hud_chat")
+	eq(vm.sent[2].value.open, true)
+	opts.chat_open = false
+	vm.hud()(state)
+	eq(vm.sent[3].value.open, false)
 end)

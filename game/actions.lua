@@ -102,11 +102,11 @@ function M.on_input(player, input)
 	end
 	was_secondary[name] = sec
 
-	-- E opens the menu, but not while one of our screens is open: the client still reports the key
-	-- while the player types "e" into a text field (the warp screen's world name, a price, ...).
-	-- Typing into the chat box has the same problem and cannot be fixed here (engine gap).
+	-- E opens the menu, but not while one of our screens or the chat box is open: the client still
+	-- reports the key while the player types "e" into a text field or a chat message.
 	local menu = input.keybinds and input.keybinds["base:inventory"] or false
-	if menu and not was_menu[name] and not require("game.ui_events").screen_open(player) then
+	local ui_events = require("game.ui_events")
+	if menu and not was_menu[name] and not ui_events.screen_open(player) and not ui_events.chatting(player) then
 		require("game.menu").open_menu(player)
 	end
 	was_menu[name] = menu

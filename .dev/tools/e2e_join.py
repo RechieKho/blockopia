@@ -106,6 +106,15 @@ try:
     alice.ui("close").click()
     expect(alice).not_.to_have_ui_open("bp:warp")
 
+    step("E does not open the menu while typing in the chat box")
+    alice.key_press("enter")  # open the chat box
+    time.sleep(0.5)
+    alice.key_press("inventory")
+    time.sleep(1)
+    expect(alice).not_.to_have_ui_open("bp:menu", timeout=1)
+    alice.key_press("escape")  # close the chat box
+    time.sleep(0.5)
+
     step("dig straight down twice (drop rolls forced to succeed)")
     server.run_lua("math.random = function(a, b) if a then return a end return 0 end")
     for _ in range(2):

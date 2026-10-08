@@ -825,3 +825,23 @@ test("E opens the menu, but not while a screen is open (typing 'e' into a text f
 	eq(a.ui.name, "bp:menu", "E works again once the screen is closed")
 	eq(#a.ui_log, opened + 1)
 end)
+
+test("E does not open the menu while the chat box is open", function()
+	fresh()
+	local a = dev("alice")
+	local function press_e()
+		M.input(a, { menu = true })
+		M.input(a, {})
+	end
+	M.ui_event(a, "hud_chat", { open = true }, "")
+	press_e() -- typing "hello" into the chat box
+	eq(a.ui, nil, "E while chatting must not open the menu")
+	M.ui_event(a, "hud_chat", { open = false }, "")
+	press_e()
+	eq(a.ui.name, "bp:menu")
+	-- junk from the client is ignored
+	M.ui_event(a, "hud_chat", "yes", "")
+	M.ui_event(a, "close", nil)
+	press_e()
+	eq(#a.ui_log, 2)
+end)
