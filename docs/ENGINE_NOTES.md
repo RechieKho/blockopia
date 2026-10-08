@@ -28,7 +28,7 @@ built locally with networking, asset sync and the engine's e2e automation harnes
 The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real session:
 
 1. Joining with Keycloak (`auth.lua`), including `login.claims.groups`.
-2. Whether non-air-but-non-solid blocks (shrubs) render and can be broken as expected.
+2. Punching, splicing and harvesting shrubs (walk-through blocks) in a real session; they render correctly.
 3. HUD layout at larger window sizes (only checked at 720 x 360).
 4. The hidden-chat-line HUD channel (below) under heavy chat.
 
@@ -64,6 +64,7 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 | Rendering uses float coordinates far from the origin | blocks jittered near ±131 000 (the first map) | the map is 64 x 64 worlds of 256 blocks, so everything stays within ±8192 | camera-relative rendering |
 | Custom keybinds (E, Esc) are sent while the chat box or a text field is open | typing "e" opens the menu | every screen opens through `ui_events.open`, so the server ignores E while one of our screens is open (until its `close` event); the chat box cannot be detected | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
 | `vb host` / `vb pack dev` share one `default` instance world across packs, and saved chunks are not checked against the block registry | chunks another pack saved load as its blocks (untextured base blocks and water at spawn) | README: delete `servers/default/world`, or use a named `vb server` instance | a world per pack (or a registry stamp in the save that refuses or regenerates on mismatch) |
+| Pack blocks are drawn in the opaque pass with no alpha cutout (only the base pack's leaves/water count as transparent, from a hard-coded colour table) | a transparent texel hides the terrain behind it, so see-through shrubs showed holes of sky | shrub textures are fully opaque leafy bushes (`.dev/tools/gen_textures.py`) | `discard` below an alpha threshold in the chunk shader, or a `cutout`/`transparent` flag on `vb.register_block` |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
 
 ## Notes on engine behaviour the pack depends on
