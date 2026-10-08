@@ -36,13 +36,6 @@ vb pack dev                             # host with restart-on-save and open the
 `play_local.sh` copies the pack without `auth.lua` to `.dev/local/` and starts singleplayer on the
 copy (run it again after editing). Accounts are then keyed `dev:<player name>`.
 
-On an engine you built yourself (no `-DVB_DISTRIBUTION=ON`) you can also host without Keycloak:
-
-```sh
-vb host --pack . -- --insecure-skip-auth   # custom builds only: released builds reject the flag
-vb launch --connect localhost
-```
-
 In game: **E** opens the menu, **left click** punches, **right click** places a block / plants a seed
 / splices a seed onto a growing shrub / uses the wrench. **Chat commands** (`!help`):
 
@@ -74,9 +67,8 @@ Then register a user at `http://localhost:8080/realms/blockopia/account`. Modera
 Keycloak **groups** named `moderators` and `admins` (add a user to a group in the admin console).
 For another host set `[auth] issuer` / `client_id` in `server.toml` (see `server.toml.example`).
 
-Developing without Keycloak: use `.dev/tools/play_local.sh` (singleplayer, works on released
-builds) or, on a custom engine build only, run the server with `--insecure-skip-auth` (`vb pack dev`
-does not add it). Accounts are then keyed `dev:<player name>`.
+Developing without Keycloak: use `.dev/tools/play_local.sh` (singleplayer on a copy of the pack
+without `auth.lua`). Accounts are then keyed `dev:<player name>`.
 
 ## Layout
 

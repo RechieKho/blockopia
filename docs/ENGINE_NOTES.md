@@ -8,7 +8,7 @@ source and docs and built headless locally (`VB_WITH_LUA`, `VB_WITH_WORLDGEN`, n
 
 - `vb pack check --json --strict` is clean: the whole pack loads (86 blocks), the Lua sandbox lint
   passes, and no `vb.*` call appears in `ui/` or the reverse.
-- The real server starts with the pack (`--insecure-skip-auth`), runs 400 ticks without script
+- The real server starts with the pack, runs 400 ticks without script
   errors, and persists `vb.storage.block_order`.
 - API shapes the pack calls were read from the engine source: `player:punch/break_block/place_block`,
   `give/take/get_inventory/get_held_item`, `player_death` decisions (`heal`, `pos`, `message`),
@@ -60,7 +60,6 @@ singleplayer (`.dev/tools/play_local.sh`) works because it reads `ui/` and textu
 | `vb.world.raycast` and `Player:punch` only hit **solid** blocks | shrubs (walk-through) could not be punched, wrenched or spliced | `lib/ray.lua` marches the ray in Lua; shrubs are broken with `player:break_block`, everything else with `player:punch` | a `raycast` option to include non-solid blocks |
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
-| `--insecure-skip-auth` is compiled out of released builds; `vb pack dev` cannot pass it either | local multiplayer needs Keycloak | `.dev/tools/play_local.sh` plays singleplayer on a copy of the pack without `auth.lua`; custom builds can use `vb host --pack . -- --insecure-skip-auth` | a dev-only auth bypass for `vb pack dev` |
 
 ## Notes on engine behaviour the pack depends on
 

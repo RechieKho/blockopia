@@ -2,8 +2,7 @@
 # Plays Blockopia locally in singleplayer, without Keycloak, on a released engine build.
 #
 # Why this exists:
-#   - `--insecure-skip-auth` is compiled out of released engine builds, so a pack with an auth.lua
-#     always needs Keycloak there.
+#   - A pack with an auth.lua always needs Keycloak, even in singleplayer.
 #   - Released builds (engine 0.1.2) are built without VB_WITH_COMPRESSION, which turns asset
 #     sync off: a client that joins a server never receives ui/*.lua or textures/ (no HUD, no
 #     menus, no chat, white blocks). Singleplayer reads both straight from disk instead.

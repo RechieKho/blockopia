@@ -1,5 +1,5 @@
 -- Accounts, keyed by the Keycloak subject (player:get_login().subject), never by player name.
--- With the engine started without auth (--insecure-skip-auth) there is no login, and the account
+-- Without auth (no auth.lua, e.g. .dev/tools/play_local.sh) there is no login, and the account
 -- key is "dev:<name>" instead.
 local store = require("game.store")
 local ledger = require("game.ledger")

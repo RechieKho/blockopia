@@ -147,8 +147,8 @@ off, and the largest safe coordinate (for the world-name grid in Phase 6).
    - `Account { subject, display_name, coins, stats, groups }`, keyed by the Keycloak `subject`
      from `player:get_login()`, never by the player name.
    - `accounts.of(player)` is the only way gameplay code finds an account.
-   - Development: `--insecure-skip-auth` makes `get_login()` return `nil`; the accounts module
-     then uses `dev:<player name>` as the key. That flag does not exist in release builds.
+   - Development: without `auth.lua` (`.dev/tools/play_local.sh`) `get_login()` returns `nil`;
+     the accounts module then uses `dev:<player name>` as the key.
 4. **Inventory and HUD** (`ui/hud.lua`)
    - Items use the engine inventory (`give`, `take`, `get_inventory`, `max_stack = 200`).
    - Coins are an account balance, not an inventory item, so they never fill a slot. The HUD
@@ -423,7 +423,7 @@ player. Trades cannot duplicate items, even when a player disconnects mid-trade 
 P0 (done) ─► P1 foundations ──► P3 punch/drops ──► P4 farming ──► P5 splicing
                  │                    │
                  ├──► P2 Keycloak     └──► P6 worlds ──► P7 locks ──► P8 economy ──► P9
-                 │    (in parallel; development uses --insecure-skip-auth)
+                 │    (in parallel; development runs without auth.lua)
                  └──► engine: Player:set_pos (needed before P6)
 ```
 
