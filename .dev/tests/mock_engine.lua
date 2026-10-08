@@ -96,6 +96,9 @@ end
 function Player:get_health()
 	return { current = self.health, max = 20 }
 end
+function Player:set_pos(x, y, z)
+	self.x, self.y, self.z = x, y, z
+end
 function Player:damage(amount, cause)
 	self.health = self.health - amount
 	if self.health <= 0 then
@@ -211,7 +214,7 @@ end
 
 -- ---- loading ---------------------------------------------------------------------------
 
--- opts.db / opts.storage carry saved state across a "restart"; opts.set_pos adds Player:set_pos.
+-- opts.db / opts.storage carry saved state across a "restart".
 function M.load(opts)
 	opts = opts or {}
 	for name in pairs(package.loaded) do
@@ -225,13 +228,6 @@ function M.load(opts)
 	M.storage = opts.storage and floatify(opts.storage) or {}
 	M.pipeline, M.keybinds = nil, {}
 	M.auth_required = opts.auth_required or false
-	if opts.set_pos then
-		Player.set_pos = function(self, x, y, z)
-			self.x, self.y, self.z = x, y, z
-		end
-	else
-		Player.set_pos = nil
-	end
 
 	vb = {
 		storage = M.storage,

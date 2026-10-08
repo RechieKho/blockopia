@@ -11,7 +11,6 @@ local M = {}
 local G, CELL = balance.world_grid, balance.world_cell_size
 
 local by_name, by_cell, loaded = {}, {}, false
-local pending_warp = {} -- player name -> { x, y, z } for the death-and-respawn fallback
 
 local function ensure()
 	if loaded then
@@ -60,35 +59,14 @@ function M.owner_name(idx)
 	return locks.owner_name_at(cx, cz)
 end
 
--- Moves a player. Uses Player:set_pos (engine 0.1.3+). Older engines have none, so the
--- fallback kills the player with cause "warp" and the player_death handler respawns them at the
--- target (see M.on_death).
-local function has_set_pos(player)
-	local ok, fn = pcall(function()
-		return player.set_pos
-	end)
-	return ok and fn ~= nil
-end
-
 function M.teleport(player, x, y, z)
-	if has_set_pos(player) then
-		player:set_pos(x, y, z)
-		return
-	end
-	pending_warp[player:get_name()] = { x = x, y = y, z = z }
-	player:damage(1000000, "warp")
+	player:set_pos(x, y, z)
 end
 
 -- player_death handler. Returns a DeathDecision table or nil.
-function M.on_death(player, cause)
-	local name = player:get_name()
-	local target = pending_warp[name]
-	pending_warp[name] = nil
+function M.on_death(player)
 	local health = player:get_health()
 	local full = health and health.max or 20
-	if target then
-		return { heal = full, pos = target, message = "" }
-	end
 	-- Respawn in the world where the player died.
 	local p = player:get_pos()
 	local idx = M.cell_at(p.x, p.z)

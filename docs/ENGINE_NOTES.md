@@ -37,8 +37,8 @@ above, but these still need a real session:
   server warns at startup when asset sync is off.
 - **Client asset cache.** Files with identical bytes under different paths no longer fail a cold
   join, and the reconnect fast path no longer empties the client's files.
-- **`Player:set_pos(x, y, z)`** exists, so `!warp` teleports directly instead of using the
-  death-and-respawn fallback in `game/worlds.lua`. Also new: `Player:get_spawn_pos()`.
+- **`Player:set_pos(x, y, z)`** exists; `!warp` uses it (the old death-and-respawn workaround is
+  gone). Also new: `Player:get_spawn_pos()`.
 
 ## Gaps and workarounds
 

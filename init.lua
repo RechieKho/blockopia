@@ -63,9 +63,9 @@ ui_events.route("menu", function(player, ctx, kind, value)
 	require("game.menu").on_ui_event(player, ctx, kind, value)
 end)
 
-vb.on("player_death", function(player, cause)
-	local decision = worlds.on_death(player, cause)
-	if not decision and cause ~= "warp" then
+vb.on("player_death", function(player)
+	local decision = worlds.on_death(player)
+	if not decision then
 		notify.say(player, "* you died")
 	end
 	return decision

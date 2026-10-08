@@ -310,8 +310,7 @@ one "world".
   Another name with the same hash takes the next free cell along a fixed probe sequence, so a
   name always gives the same coordinate once registered. Cell (0,0) is reserved for the hub,
   `START`.
-- **Warping uses `Player:set_pos`,** added in engine 0.1.3. `game/worlds.lua` keeps a fallback for
-  older engines (death with cause `warp` and a respawn position).
+- **Warping uses `Player:set_pos`,** added in engine 0.1.3.
 - **Warping:** the `!warp NAME` command and the `ui/warp.lua` screen (recent worlds, owner, lock
   status). Arrival point: the owner's **Main Door** if they set one, otherwise the highest solid
   block at the centre (found with `vb.world.raycast`), plus brief spawn protection.
