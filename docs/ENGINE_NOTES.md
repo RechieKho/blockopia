@@ -1,9 +1,8 @@
 # Engine notes
 
 What Blockopia needs from the Voxel Browser engine, what was verified, and where the pack works
-around a gap. Required engine: **0.1.3** (`pack.toml`). The checks below were made against `3cc9104`
-(0.1.2), read from its source and docs and built headless locally (`VB_WITH_LUA`,
-`VB_WITH_WORLDGEN`, no networking); the 0.1.3 changes (`bb9f23f`) were read from source only.
+around a gap. Required engine: **0.1.4** (`pack.toml`). Last checked against `e4776f1` (`v0.1.4`),
+built locally with networking, asset sync and the engine's e2e automation harness.
 
 ## Verified against the real engine
 
@@ -11,24 +10,30 @@ around a gap. Required engine: **0.1.3** (`pack.toml`). The checks below were ma
   passes, and no `vb.*` call appears in `ui/` or the reverse.
 - The real server starts with the pack, runs 400 ticks without script
   errors, and persists `vb.storage.block_order`.
+- End to end on 0.1.4 (`.dev/tools/e2e_join.py`: a real server and real headless clients over UDP):
+  a cold-cache client joins after the pack has written `vb.db`, receives `ui/` and textures and no
+  `db/` files; the HUD shows coins; `!world` answers in chat; `!menu`, `!store` and `!almanac` open;
+  breaking grass and dirt drops the block and its seed, which are picked up by walking onto them;
+  `!warp` teleports with `set_pos` to a new world ~46 000 blocks out, whose chunks load and whose
+  ground is `bp:grass`; a second cold-cache client joins later. A windowed client under Xvfb
+  draws the textured ground, HUD, hotbar and chat after the warp.
 - API shapes the pack calls were read from the engine source: `player:punch/break_block/place_block`,
   `give/take/get_inventory/get_held_item`, `player_death` decisions (`heal`, `pos`, `message`),
   `ui_event(player, ui_name, widget_id, kind, value)` with `kind` = the string passed to
   `ui.send_event`, `on_break/on_place` callbacks receiving `{ pos, player }`, `block_break` /
   `block_place` vetoes, `region_enter`, punch healing through `vb.combat.set_params`.
 
-## NOT verified (no client or network backend was available)
+## NOT verified yet
 
-Nothing was played end to end. The mock engine in `.dev/tests/mock_engine.lua` covers the rules
-above, but these still need a real session:
+The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real session:
 
 1. Joining with Keycloak (`auth.lua`), including `login.claims.groups`.
-2. Warping far from the origin (chunk loading at the destination, float precision at ±131 000).
+2. Warping to the far edge of the map (float precision at ±131 000; ~46 000 works).
 3. Whether non-air-but-non-solid blocks (shrubs) render and can be broken as expected.
-4. HUD layout at real window sizes (the UI is only render-checked in a fake VM).
+4. HUD layout at larger window sizes (only checked at 720 x 360).
 5. The hidden-chat-line HUD channel (below) under heavy chat.
 
-## Fixed in engine 0.1.3
+## Fixed in engine 0.1.3 and 0.1.4
 
 - **Asset sync in release builds.** 0.1.2 release builds were compiled without
   `VB_WITH_COMPRESSION`, so the server skipped asset sync without a word and joining clients got
@@ -39,6 +44,11 @@ above, but these still need a real session:
   join, and the reconnect fast path no longer empties the client's files.
 - **`Player:set_pos(x, y, z)`** exists; `!warp` uses it (the old death-and-respawn workaround is
   gone). Also new: `Player:get_spawn_pos()`.
+- **0.1.4: runtime state kept out of the asset manifest.** 0.1.3 served `db/` (`vb.db`) and
+  `storage.json` as pack assets: every client could download the server's database, and after the
+  pack's first `vb.db` write (the game clock, every 10 s) the manifest was stale, so later
+  cold-cache joins failed with "asset transfer failed (hash mismatch or size cap)". 0.1.4 excludes
+  `db/`, `storage.json` and the world directory, and re-hashes files before serving them.
 
 ## Gaps and workarounds
 

@@ -26,9 +26,9 @@ vb pack dev                             # host with restart-on-save and open the
 .dev/tools/play_local.sh
 ```
 
-Needs Voxel Browser **0.1.3** or newer (`pack.toml` enforces it). Older released builds shipped
-without asset sync, so joining clients never received `ui/` or `textures/`; check that
-`vb --version` lists `+asset-sync`. See `docs/ENGINE_NOTES.md`.
+Needs Voxel Browser **0.1.4** or newer (`pack.toml` enforces it). 0.1.2 shipped without asset
+sync (no UI or textures for joining clients), and on 0.1.3 a client that joined after the pack's
+first `vb.db` write failed with "asset transfer failed". See `docs/ENGINE_NOTES.md`.
 
 `play_local.sh` copies the pack without `auth.lua` to `.dev/local/` and starts singleplayer on the
 copy (run it again after editing). Accounts are then keyed `dev:<player name>`.
@@ -80,7 +80,7 @@ without `auth.lua`). Accounts are then keyed `dev:<player name>`.
 | `data/*.lua` | server | everything tunable: items, splice recipes, lock tiers, store, `balance.lua` |
 | `ui/*.lua` | client UI VM | HUD and screens (cannot touch `vb`) |
 | `ops/keycloak/` | - | Keycloak + Postgres compose file and realm export |
-| `.dev/` | - | tests and tools (`tools/play_local.sh`); dot-directories are not loaded as pack code |
+| `.dev/` | - | tests and tools (`tools/play_local.sh`, `tools/e2e_join.py`); dot-directories are not loaded as pack code |
 | `docs/` | - | `PLAN.md` (design), `ENGINE_NOTES.md` (engine gaps and workarounds) |
 
 ### Adding content
