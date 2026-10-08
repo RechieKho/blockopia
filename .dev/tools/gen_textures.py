@@ -70,20 +70,26 @@ def seed(key, color):
 
 
 def shrub(key, color, stage):
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    green = (60, 150, 60, 255)
-    height = (4, 9, 14)[stage]
-    for y in range(SIZE - height, SIZE):
-        img.putpixel((8, y), green)
-    for i in range(1, stage + 2):
-        y = SIZE - 2 - i * 3
-        if y >= 0:
-            for dx in (-2, -1, 1, 2):
-                img.putpixel((8 + dx, y), green)
-    if stage == 2:  # ripe: fruit in the species colour
-        for (x, y) in ((6, 2), (10, 3), (7, 5), (9, 6), (8, 1)):
-            img.putpixel((x, y), color + (255,))
-            img.putpixel((x + 1, y), color + (255,))
+    # Fully opaque on purpose: the engine draws pack blocks in its opaque pass with no alpha cutout,
+    # so a transparent texel would hide the terrain behind it (it shows the sky instead). A shrub
+    # is a leafy bush filling the block: leaves get denser as it grows, and a ripe one shows fruit
+    # in the species colour.
+    rng = random.Random("%s_s%d" % (key, stage))
+    shadow = (28, 74, 32)
+    leaf = ((92, 178, 84), (70, 156, 64), (58, 138, 56))[stage]
+    density = (0.35, 0.6, 0.8)[stage]
+    img = Image.new("RGBA", (SIZE, SIZE), shadow + (255,))
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if rng.random() < density:
+                img.putpixel((x, y), shade(leaf, rng.randint(-18, 18)) + (255,))
+    border(img, shade(shadow, -12))
+    if stage == 2:
+        dark = shade(color, -70)
+        for (x, y) in ((3, 3), (10, 2), (6, 7), (12, 8), (3, 11), (9, 12)):
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                img.putpixel((x + dx, y + dy), color + (255,))
+            img.putpixel((x + 1, y + 1), dark + (255,))
     save("%s_s%d" % (key, stage), img)
 
 
