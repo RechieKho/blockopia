@@ -9,7 +9,20 @@ local balance = require("data.balance")
 local M = {}
 
 local contexts = {} -- player name -> table describing the open screen
+local open_screens = {} -- player name -> name of the Blockopia screen showing on the client
 local buckets = {} -- player name -> { tokens, time }
+
+-- Opens a screen on the player's client. Every screen goes through here, so the server knows one
+-- is showing until the client's "close" event (sent by ui.close(), the only way a screen closes).
+function M.open(player, screen, data)
+	open_screens[player:get_name()] = screen
+	player:open_ui(screen, data)
+end
+
+-- True while one of our screens is open on the player's client.
+function M.screen_open(player)
+	return open_screens[player:get_name()] ~= nil
+end
 
 function M.set_context(player, ctx)
 	contexts[player:get_name()] = ctx
@@ -21,6 +34,7 @@ end
 
 function M.clear(player)
 	contexts[player:get_name()] = nil
+	open_screens[player:get_name()] = nil
 	buckets[player:get_name()] = nil
 end
 
@@ -54,6 +68,7 @@ function M.on_ui_event(player, ui_name, widget_id, event_kind, value)
 	if event_kind == "close" then
 		local ctx = contexts[name]
 		contexts[name] = nil
+		open_screens[name] = nil
 		if ctx and ctx.screen == "bp:trade" then
 			require("game.trade").cancel(player, "closed the trade window")
 		end

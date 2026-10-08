@@ -94,6 +94,18 @@ try:
     expect(alice).to_have_ui_open("bp:almanac")
     alice.ui("close").click()
 
+    step("E opens the menu, but not while typing into the warp screen")
+    alice.key_press("inventory")
+    expect(alice).to_have_ui_open("bp:menu")
+    alice.ui("open_warp").click()
+    expect(alice).to_have_ui_open("bp:warp")
+    alice.ui("name").fill("HOMEE")
+    alice.key_press("inventory")
+    time.sleep(1)
+    expect(alice).to_have_ui_open("bp:warp")
+    alice.ui("close").click()
+    expect(alice).not_.to_have_ui_open("bp:warp")
+
     step("dig straight down twice (drop rolls forced to succeed)")
     server.run_lua("math.random = function(a, b) if a then return a end return 0 end")
     for _ in range(2):

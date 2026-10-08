@@ -190,7 +190,7 @@ function M.open_screen(player, lock)
 	local can_edit = lock.owner == acc.subject
 	local is_admin = L.is_owner_or_admin(lock, acc.subject)
 	require("game.ui_events").set_context(player, { screen = "bp:lock", lock_id = lock.id })
-	player:open_ui("bp:lock", {
+	require("game.ui_events").open(player, "bp:lock", {
 		id = lock.id, tier = tier.name, owner = lock.owner_name, size = lock.size,
 		max_size = tier.size, adjustable = tier.adjustable, public = lock.public,
 		admins = names_of(lock, lock.admins), builders = names_of(lock, lock.builders),

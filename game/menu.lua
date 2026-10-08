@@ -9,13 +9,13 @@ local M = {}
 function M.open_menu(player)
 	local acc = accounts.of(player)
 	ui_events.set_context(player, { screen = "bp:menu" })
-	player:open_ui("bp:menu", { coins = acc.coins, name = acc.name, world = worlds.info(player) })
+	require("game.ui_events").open(player, "bp:menu", { coins = acc.coins, name = acc.name, world = worlds.info(player) })
 end
 
 function M.open_warp(player)
 	local acc = accounts.of(player)
 	ui_events.set_context(player, { screen = "bp:warp" })
-	player:open_ui("bp:warp", { recent = worlds.list_recent(acc), here = worlds.info(player) })
+	require("game.ui_events").open(player, "bp:warp", { recent = worlds.list_recent(acc), here = worlds.info(player) })
 end
 
 -- Events from the menu and warp screens.

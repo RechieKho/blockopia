@@ -51,7 +51,7 @@ function M.refresh(t)
 		if player and acc then
 			local other = T.other(t, name)
 			ui_events.set_context(player, { screen = "bp:trade" })
-			player:open_ui("bp:trade", {
+			require("game.ui_events").open(player, "bp:trade", {
 				partner = other, coins = acc.coins,
 				mine = describe(t, name), theirs = describe(t, other),
 				my_coins = t.offers[name].coins, their_coins = t.offers[other].coins,
