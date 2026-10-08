@@ -22,16 +22,13 @@ as a content pack in Lua.
 # with Keycloak running (see "Sign-in"):
 vb pack dev                             # host with restart-on-save and open the client
 
-# without Keycloak, on a released engine build (local singleplayer, nobody is verified):
+# without Keycloak (local singleplayer, nobody is verified):
 .dev/tools/play_local.sh
 ```
 
-> **Released engine builds (0.1.2) cannot show this pack over a network yet.** They are compiled
-> without `VB_WITH_COMPRESSION`, which switches asset sync off, so a client that joins a server
-> (including `vb pack dev`) never receives `ui/*.lua` or `textures/`: no HUD, menus, chat or
-> hotbar, and every block is white. Singleplayer reads both from disk, so use
-> `.dev/tools/play_local.sh` until the engine ships builds with asset sync. See
-> `docs/ENGINE_NOTES.md`.
+Needs Voxel Browser **0.1.3** or newer (`pack.toml` enforces it). Older released builds shipped
+without asset sync, so joining clients never received `ui/` or `textures/`; check that
+`vb --version` lists `+asset-sync`. See `docs/ENGINE_NOTES.md`.
 
 `play_local.sh` copies the pack without `auth.lua` to `.dev/local/` and starts singleplayer on the
 copy (run it again after editing). Accounts are then keyed `dev:<player name>`.

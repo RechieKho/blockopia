@@ -1,12 +1,7 @@
 #!/bin/sh
-# Plays Blockopia locally in singleplayer, without Keycloak, on a released engine build.
+# Plays Blockopia locally in singleplayer, without Keycloak.
 #
-# Why this exists:
-#   - A pack with an auth.lua always needs Keycloak, even in singleplayer.
-#   - Released builds (engine 0.1.2) are built without VB_WITH_COMPRESSION, which turns asset
-#     sync off: a client that joins a server never receives ui/*.lua or textures/ (no HUD, no
-#     menus, no chat, white blocks). Singleplayer reads both straight from disk instead.
-#
+# A pack with an auth.lua always needs Keycloak, even in singleplayer.
 # This copies the pack, minus auth.lua, to .dev/local/pack and starts singleplayer on the copy.
 # Run it again after editing the pack. The copy's world and storage are kept between runs; delete
 # .dev/local/ to start over. Extra arguments go to the client.

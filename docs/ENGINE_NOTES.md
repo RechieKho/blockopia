@@ -1,8 +1,9 @@
 # Engine notes
 
 What Blockopia needs from the Voxel Browser engine, what was verified, and where the pack works
-around a gap. Engine checked: commit `3cc9104` (`voxel_browser 0.1.2`, protocol 30), read from its
-source and docs and built headless locally (`VB_WITH_LUA`, `VB_WITH_WORLDGEN`, no networking).
+around a gap. Required engine: **0.1.3** (`pack.toml`). The checks below were made against `3cc9104`
+(0.1.2), read from its source and docs and built headless locally (`VB_WITH_LUA`,
+`VB_WITH_WORLDGEN`, no networking); the 0.1.3 changes (`bb9f23f`) were read from source only.
 
 ## Verified against the real engine
 
@@ -27,30 +28,22 @@ above, but these still need a real session:
 4. HUD layout at real window sizes (the UI is only render-checked in a fake VM).
 5. The hidden-chat-line HUD channel (below) under heavy chat.
 
-## Released builds have no asset sync (engine bug)
+## Fixed in engine 0.1.3
 
-The engine's release workflows (`.github/workflows/build_linux.yml`, `build_windows.yml`,
-`build_macos.yml` at `3cc9104` / `v0.1.2`) configure with `-DVB_WITH_LUA=ON -DVB_WITH_NET=ON` but
-not `-DVB_WITH_COMPRESSION=ON`, which defaults to `OFF`. Without it `assetsync::build_manifest`
-returns `kDisabled`, the server skips asset sync without logging anything, and a joining client
-gets no pack files at all. Seen in play:
-
-- `ui/*.lua` never loads, so `player:open_ui` logs `ui.open: 'bp:menu' was never defined via
-  ui.define` (same for `bp:store`, `bp:almanac`, ...).
-- No HUD: the engine draws chat and the hotbar only through the pack's `ui.define_hud`, so chat
-  replies (`!world`, `!help`) and picked-up drops are invisible.
-- No textures: every pack block falls back to `WHITE` in `render/texture_atlas.cpp`, so worlds
-  look white (the flat ground itself is by design).
-
-Engine fix: add `-DVB_WITH_COMPRESSION=ON` to the three distribution builds (the automation job in
-`build_linux.yml` already has it), and log a warning when the manifest is disabled. Until then,
-singleplayer (`.dev/tools/play_local.sh`) works because it reads `ui/` and textures from disk.
+- **Asset sync in release builds.** 0.1.2 release builds were compiled without
+  `VB_WITH_COMPRESSION`, so the server skipped asset sync without a word and joining clients got
+  no `ui/*.lua` or textures: `ui.open: 'bp:menu' was never defined via ui.define`, no HUD (so no
+  chat or hotbar) and white blocks. 0.1.3 builds with it, `--version` lists `+asset-sync`, and the
+  server warns at startup when asset sync is off.
+- **Client asset cache.** Files with identical bytes under different paths no longer fail a cold
+  join, and the reconnect fast path no longer empties the client's files.
+- **`Player:set_pos(x, y, z)`** exists, so `!warp` teleports directly instead of using the
+  death-and-respawn fallback in `game/worlds.lua`. Also new: `Player:get_spawn_pos()`.
 
 ## Gaps and workarounds
 
 | Gap | Effect | Workaround in the pack | Engine change that would remove it |
 | --- | --- | --- | --- |
-| `Player` has no `set_pos` | cannot teleport for `!warp` | `game/worlds.lua` uses `set_pos` if it ever exists; otherwise it "kills" the player with cause `warp` and the `player_death` handler respawns them at the target (full heal, no death message, inventory kept) | `Player:set_pos(x, y, z)` |
 | No server -> HUD data channel | coins/world could not be shown | `game/hud.lua` sends a hidden private chat line (`@@bp\|coins=..\|world=..`) every 3 s and on change; `ui/hud.lua` parses and hides it; chat lines starting with the marker are vetoed so players cannot forge it | `Player:set_hud_state(table)` readable from `ui.define_hud` |
 | No wall-clock time (`os` removed) | shrubs only grow while the server runs | `game/store.lua` keeps a game clock advanced by `tick`, saved every 10 s | `vb.time()` (Unix seconds) |
 | `vb.db` cannot list keys | records need indexes | `game/store.lua` collections (bucketed by 64x64 columns) and `idx:*` keys | `vb.db.keys(prefix)` |

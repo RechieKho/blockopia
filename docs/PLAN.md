@@ -109,7 +109,7 @@ the same stubs into `.vb/lua/`.
 | Wall-clock time           | **None.** Only `tick(dt)`, `vb.after`, `vb.every`                                                | Count game time from `tick` and save it. Shrubs do not grow while the server is off. Optional engine request: `vb.time()`. |
 | Outbound HTTP             | **None**                                                                                         | Not needed: the engine does Keycloak sign-in itself (Phase 2).                           |
 | Sign-in                   | **Built in.** `auth.lua` with `provider = "keycloak"`; `Player:get_login()` gives `{subject, name, claims}` | **Option A chosen.** See Phase 2.                                                       |
-| Teleport                  | `Entity:set_pos` exists, but `Player` has **no `set_pos`**. A death can return a respawn `pos`.  | **Engine gap; blocks warping (Phase 6).** Ask for `Player:set_pos` in the engine.        |
+| Teleport                  | `Player:set_pos(x, y, z)` (engine 0.1.3+). A death can also return a respawn `pos`.              | Resolved: added in engine 0.1.3.                                                         |
 | Kick / ban                | Vetoing `player_join` keeps an account out. The engine itself kicks a second session of the same account. | Bans keyed on `login.subject`.                                                           |
 | Per-block state           | None                                                                                             | State table in `vb.db` keyed by position, plus one block id per growth stage.            |
 | Entities                  | `vb.register_entity`, `vb.world.spawn`                                                           | Only for extras; drops use the engine's item drops.                                      |
@@ -310,9 +310,8 @@ one "world".
   Another name with the same hash takes the next free cell along a fixed probe sequence, so a
   name always gives the same coordinate once registered. Cell (0,0) is reserved for the hub,
   `START`.
-- **Warping needs an engine change:** the engine cannot move a player yet (`Player` has no
-  `set_pos`). Add `Player:set_pos` to the engine before this phase. A workaround through death and
-  a respawn position exists, but it shows a death and is not worth building.
+- **Warping uses `Player:set_pos`,** added in engine 0.1.3. `game/worlds.lua` keeps a fallback for
+  older engines (death with cause `warp` and a respawn position).
 - **Warping:** the `!warp NAME` command and the `ui/warp.lua` screen (recent worlds, owner, lock
   status). Arrival point: the owner's **Main Door** if they set one, otherwise the highest solid
   block at the centre (found with `vb.world.raycast`), plus brief spawn protection.
@@ -424,7 +423,7 @@ P0 (done) ─► P1 foundations ──► P3 punch/drops ──► P4 farming �
                  │                    │
                  ├──► P2 Keycloak     └──► P6 worlds ──► P7 locks ──► P8 economy ──► P9
                  │    (in parallel; development runs without auth.lua)
-                 └──► engine: Player:set_pos (needed before P6)
+                 └──► engine: Player:set_pos (done in 0.1.3)
 ```
 
 P2 is small now that the engine signs players in, and can run alongside P3-P6. It must be

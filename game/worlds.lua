@@ -60,7 +60,7 @@ function M.owner_name(idx)
 	return locks.owner_name_at(cx, cz)
 end
 
--- Moves a player. Uses Player:set_pos when the engine has it. Older engines have none, so the
+-- Moves a player. Uses Player:set_pos (engine 0.1.3+). Older engines have none, so the
 -- fallback kills the player with cause "warp" and the player_death handler respawns them at the
 -- target (see M.on_death).
 local function has_set_pos(player)
