@@ -63,6 +63,7 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
 | Rendering uses float coordinates far from the origin | blocks jittered near ±131 000 (the first map) | the map is 64 x 64 worlds of 256 blocks, so everything stays within ±8192 | camera-relative rendering |
 | Custom keybinds (E, Esc) are sent while the chat box is open | typing "e" opens the menu | none possible: the server only sees key state | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
+| `vb host` / `vb pack dev` share one `default` instance world across packs, and saved chunks are not checked against the block registry | chunks another pack saved load as its blocks (untextured base blocks and water at spawn) | README: delete `servers/default/world`, or use a named `vb server` instance | a world per pack (or a registry stamp in the save that refuses or regenerates on mismatch) |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
 
 ## Notes on engine behaviour the pack depends on

@@ -31,6 +31,15 @@ Needs Voxel Browser **0.1.4** or newer (`pack.toml` enforces it). 0.1.2 shipped 
 sync (no UI or textures for joining clients), and on 0.1.3 a client that joined after the pack's
 first `vb.db` write failed with "asset transfer failed". See `docs/ENGINE_NOTES.md`.
 
+**Untextured blocks around spawn?** `vb pack dev` and `vb host` always use the engine's `default`
+server instance, whose world save is shared by every pack it has hosted, and the engine does not
+check which pack saved a chunk. Chunks saved by another pack (or an older Blockopia map) come back
+as that pack's blocks. Stop the server and delete the instance's world:
+`~/.local/share/voxel_browser/servers/default/world` (Linux),
+`%LOCALAPPDATA%\voxel_browser\servers\default\world` (Windows) or
+`~/Library/Application Support/voxel_browser/servers/default/world` (macOS). For a world of its
+own, use a named instance: `vb server new blockopia --pack .` then `vb server start blockopia`.
+
 `play_local.sh` copies the pack without `auth.lua` to `.dev/local/` and starts singleplayer on the
 copy (run it again after editing). Accounts are then keyed `dev:<player name>`.
 
