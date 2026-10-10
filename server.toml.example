@@ -7,7 +7,9 @@ persist_world = true
 world_dir = "world"
 autosave_interval_seconds = 60.0
 max_connections_per_ip = 4
-max_messages_per_second = 60.0
+# No per-connection message limit: the engine counts every message, and clients send one input
+# message per rendered frame, so a limit below their frame rate silently drops chat and UI clicks.
+max_messages_per_second = 0
 motd = "Welcome to Blockopia"
 
 # Sign-in is mandatory because the pack ships an auth.lua. These override the issuer and client

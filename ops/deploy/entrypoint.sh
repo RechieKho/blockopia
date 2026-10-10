@@ -4,6 +4,7 @@
 # /data (a volume) keeps everything that must survive an update:
 #   /data/pack/db/, /data/pack/storage.json   the pack's vb.db / vb.storage (accounts, locks, ...)
 #   /data/world/                              the saved world
+#   /data/world_seed                          the world seed, chosen once (or WORLD_SEED)
 #   /data/server.toml                         generated below on every start
 # The pack itself is copied from the image on every start, so a new image brings new code.
 set -eu
@@ -24,6 +25,17 @@ elif [ -z "${AUTH_ISSUER:-}" ]; then
 	exit 1
 fi
 
+# The seed must stay the same for a saved world, or new chunks would not match the saved ones.
+if [ -n "${WORLD_SEED:-}" ]; then
+	seed=$WORLD_SEED
+elif [ -s /data/world_seed ]; then
+	seed=$(cat /data/world_seed)
+else
+	seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+	seed=$((seed + 1)) # 0 would mean "random on every start"
+	echo "$seed" > /data/world_seed
+fi
+
 toml_string() {
 	# a TOML basic string: escape backslashes and quotes
 	printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
@@ -35,11 +47,15 @@ toml_string() {
 	echo "content_pack = \"$pack\""
 	echo "world_dir = \"/data/world\""
 	echo "persist_world = true"
+	echo "world_seed = $seed"
 	echo "max_players = ${MAX_PLAYERS:-32}"
 	echo "tick_rate = 20"
 	echo "view_distance = ${VIEW_DISTANCE:-6}"
 	echo "max_connections_per_ip = ${MAX_CONNECTIONS_PER_IP:-4}"
-	echo "max_messages_per_second = 60.0"
+	# 0 = no per-connection message limit. The engine counts every message, and a client sends one
+	# input message per rendered frame, so any limit below the players' frame rates silently drops
+	# their chat and UI clicks (engine 0.1.5).
+	echo "max_messages_per_second = ${MAX_MESSAGES_PER_SECOND:-0}"
 	echo "autosave_interval_seconds = 60.0"
 	echo "motd = $(toml_string "${MOTD:-Welcome to Blockopia}")"
 	if [ "${BLOCKOPIA_NO_AUTH:-0}" != "1" ]; then

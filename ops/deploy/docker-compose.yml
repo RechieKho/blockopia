@@ -29,6 +29,7 @@ services:
       MAX_PLAYERS: ${MAX_PLAYERS:-32}
       VIEW_DISTANCE: ${VIEW_DISTANCE:-6}
       MOTD: ${MOTD:-Welcome to Blockopia}
+      WORLD_SEED: ${WORLD_SEED:-}
     ports:
       - "${GAME_PORT:-7777}:${GAME_PORT:-7777}/udp"
     volumes:
