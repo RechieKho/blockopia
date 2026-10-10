@@ -10,3 +10,5 @@ ops/keycloak/.env
 server.toml
 # Local singleplayer copy made by .dev/tools/play_local.sh
 .dev/local/
+# docker compose secrets for ops/deploy
+ops/deploy/.env

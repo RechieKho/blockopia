@@ -1,0 +1,10 @@
+# Docker build context for ops/deploy/Dockerfile: the pack only, never local state or secrets.
+.git
+.dev
+.vb
+db
+world
+storage.json
+server.toml
+ops/keycloak/.env
+ops/deploy/.env

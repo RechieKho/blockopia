@@ -77,6 +77,34 @@ For another host set `[auth] issuer` / `client_id` in `server.toml` (see `server
 Developing without Keycloak: use `.dev/tools/play_local.sh` (singleplayer on a copy of the pack
 without `auth.lua`). Accounts are then keyed `dev:<player name>`.
 
+## Deploy (Docker)
+
+`ops/deploy/` runs a public server on one host: the game server (Voxel Browser built from source at
+a pinned tag, with this pack), Keycloak and Postgres for sign-in, and Caddy giving Keycloak HTTPS
+with a Let's Encrypt certificate (the engine only accepts an `https` issuer).
+
+```sh
+cd ops/deploy
+cp .env.example .env          # AUTH_DOMAIN, ACME_EMAIL, passwords, port, MOTD
+docker compose up -d --build  # the first build compiles the engine (~10-20 minutes)
+docker compose logs -f game
+```
+
+- **DNS and firewall:** `AUTH_DOMAIN` must resolve to the host; open 80/tcp, 443/tcp and the game
+  port (`GAME_PORT`, UDP, default 7777).
+- **Players** register at `https://AUTH_DOMAIN/realms/blockopia/account` and connect to
+  `HOST:7777`. Moderators/admins: Keycloak groups `moderators` / `admins` (admin console at
+  `https://AUTH_DOMAIN/admin`).
+- **Data:** the `game-data` volume holds the world and the pack's `vb.db`/`vb.storage`
+  (accounts, locks, worlds); the pack itself is refreshed from the image on every start, so
+  `git pull && docker compose up -d --build` updates the game without touching the data. Back up
+  with `docker run --rm -v blockopia_game-data:/data -v "$PWD":/backup ubuntu tar czf /backup/game-data.tgz /data`.
+- **Engine version:** `VB_VERSION` in `.env` (a tag of the engine repository; it must satisfy
+  `pack.toml`).
+- `BLOCKOPIA_NO_AUTH=1` runs without sign-in (anyone can join as anyone): LAN or testing only.
+  Start just the game then: `docker compose up -d --build --no-deps game` (the sign-in settings
+  can keep their example values).
+
 ## Layout
 
 | Path | Runs in | Purpose |
@@ -89,7 +117,8 @@ without `auth.lua`). Accounts are then keyed `dev:<player name>`.
 | `lib/*.lua` | server | pure rules with no `vb.*`: drops, growth, splicing, world names, lock regions, ray march, trade state |
 | `data/*.lua` | server | everything tunable: items, splice recipes, lock tiers, store, `balance.lua` |
 | `ui/*.lua` | client UI VM | HUD and screens (cannot touch `vb`) |
-| `ops/keycloak/` | - | Keycloak + Postgres compose file and realm export |
+| `ops/keycloak/` | - | Keycloak + Postgres compose file and realm export (local development) |
+| `ops/deploy/` | - | Docker Compose deployment: game server image, Keycloak, Postgres, Caddy (HTTPS) |
 | `.dev/` | - | tests and tools (`tools/play_local.sh`, `tools/e2e_join.py`); dot-directories are not loaded as pack code |
 | `docs/` | - | `PLAN.md` (design), `ENGINE_NOTES.md` (engine gaps and workarounds) |
 
