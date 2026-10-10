@@ -90,6 +90,8 @@ docker compose up -d --build  # the first build compiles the engine (~10-20 minu
 docker compose logs -f game
 ```
 
+- **First start:** Keycloak needs about half a minute; until then the game logs
+  `key fetch failed ... HTTP 502` and retries every 10 s, then `JWKS loaded`.
 - **DNS and firewall:** `AUTH_DOMAIN` must resolve to the host; open 80/tcp, 443/tcp and the game
   port (`GAME_PORT`, UDP, default 7777).
 - **Players** register at `https://AUTH_DOMAIN/realms/blockopia/account` and connect to
