@@ -48,7 +48,7 @@ def punch_until_air(client, server, pos, tries=8):
     client.look_at((pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5))
     for _ in range(tries):
         client.mouse_press("left")
-        time.sleep(0.6)  # pack punch cooldown is 0.4 s
+        time.sleep(0.4)  # pack punch cooldown is 0.25 s
         if server.block_at(pos) == "base:air":
             return True
     return False

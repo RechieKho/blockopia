@@ -44,8 +44,8 @@ and ticks it, but nothing has been played with a real client or Keycloak.
   `player:break_block` because the engine's punch ignores non-solid blocks.
 - **Moderation:** bans apply at the next join (the engine has no kick); `!removelock` clears a lock
   without returning the item.
-- **Balance:** `coin_chance` is 0.12 and the punch cooldown 0.4 s, so a small lock takes about six
-  minutes of punching dirt and a grand lock about 37 hours. Terrain is endless, so mining is not
+- **Balance:** `coin_chance` is 0.12 and the punch cooldown 0.25 s, so a small lock takes about
+  three and a half minutes of punching dirt and a grand lock about 23 hours. Terrain is endless, so mining is not
   capped; treat the numbers as a first pass.
 
 ---

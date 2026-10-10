@@ -1,7 +1,7 @@
 -- Every tunable number in one place. Pure data: no vb.* calls, so tests can load it.
 return {
 	-- Punching (vb.combat)
-	punch_cooldown_seconds = 0.4,
+	punch_cooldown_seconds = 0.25,
 	heal_after_seconds = 6.0,
 	heal_interval_seconds = 1.0,
 	reach = 6.0,
