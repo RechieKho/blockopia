@@ -54,7 +54,9 @@ In game: **E** opens the menu, **left click** punches, **right click** places a 
 
 Use the **wrench** (right click) on a shrub to see its growth, on a lock to manage access, on a
 vending machine to buy or manage it. Placing, wrenching or resizing a lock marks its area with posts
-in the lock's colour for 20 seconds.
+in the lock's colour for 20 seconds. While you hold a lock, a ring of posts previews the area it
+would claim where you aim: in its colour if it can go there, red if not, with the other players'
+locks in the way shown too.
 
 ## Sign-in (Keycloak)
 

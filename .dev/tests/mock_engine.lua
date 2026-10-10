@@ -340,7 +340,10 @@ function M.load(opts)
 			end,
 			spawn = function(kind, pos, opts)
 				assert(M.entity_kinds[kind], "unknown entity kind " .. tostring(kind))
-				local e = { kind = kind, x = pos.x, y = pos.y, z = pos.z, opts = opts }
+				local e = { kind = kind, x = pos.x, y = pos.y, z = pos.z, opts = opts, moves = 0 }
+				function e.set_pos(self, x, y, z)
+					self.x, self.y, self.z, self.moves = x, y, z, self.moves + 1
+				end
 				function e.remove(self)
 					for i, other in ipairs(M.entities) do
 						if other == self then

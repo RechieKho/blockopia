@@ -96,6 +96,19 @@ function M.can_place(acc, tier_key, x, y, z)
 	return index:can_place(acc.subject, x, z, box)
 end
 
+-- Other players' locks that a lock of this tier at (x, z) would run into (to show them).
+function M.blockers(acc, tier_key, x, z)
+	ensure()
+	local box = L.box_of(x, z, tiers[tier_key].size)
+	local found = {}
+	for _, lock in ipairs(index:overlapping(box)) do
+		if not L.is_owner_or_admin(lock, acc.subject) then
+			found[#found + 1] = lock
+		end
+	end
+	return found
+end
+
 -- Called after the lock block was placed.
 function M.create(tier_key, player, pos)
 	ensure()

@@ -71,4 +71,6 @@ return {
 	-- Lock area markers (game/borders.lua): how long they stay and about how many posts per lock.
 	lock_border_seconds = 20,
 	lock_border_posts = 64,
+	-- While a lock is held, its preview ring follows the aimed spot, updated at most this often.
+	lock_preview_seconds = 0.15,
 }

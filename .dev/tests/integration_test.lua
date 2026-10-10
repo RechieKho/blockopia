@@ -945,3 +945,64 @@ test("a lock's area is marked with posts for a while when placed, wrenched or re
 	falsy(require("game.locks").at_block(0, 64, 0))
 	eq(#M.entities, 0)
 end)
+
+test("holding a lock previews its area where it would go, red where it cannot", function()
+	fresh()
+	local a, b = dev("alice"), dev("bob")
+	local function idle(p)
+		M.advance(0.2, 0.2)
+		M.input(p, {})
+	end
+	a:give({ item = M.id("bp:lock_small"), count = 1 })
+	M.select(a, "bp:lock_small")
+	aim(0, 63, 0, 0, 1, 0)
+	idle(a)
+	local posts = {}
+	for _, e in ipairs(M.entities) do
+		posts[#posts + 1] = e
+		eq(e.opts.visual_override.texture, "textures/border_small.png")
+	end
+	truthy(#posts >= 4, "a preview ring around the aimed spot")
+	-- aiming elsewhere moves the same posts instead of spawning new ones
+	aim(6, 63, 0, 0, 1, 0)
+	idle(a)
+	eq(#M.entities, #posts)
+	truthy(posts[1].moves > 0)
+	for _, e in ipairs(M.entities) do
+		truthy(e.x >= 6 - 5 and e.x <= 6 + 6, "follows the new spot")
+	end
+	-- bob owns a lock nearby: aiming into it turns the ring red and shows bob's lock
+	M.select(a, "bp:wrench")
+	idle(a)
+	eq(#M.entities, 0, "no preview without a lock in hand")
+	b:give({ item = M.id("bp:lock_big"), count = 1 })
+	M.select(b, "bp:lock_big")
+	aim(30, 63, 30, 0, 1, 0)
+	M.click(b, "secondary")
+	M.select(b, "bp:wrench")
+	M.advance(balance.lock_border_seconds + 1)
+	eq(#M.entities, 0)
+	M.select(a, "bp:lock_small")
+	aim(10, 63, 10, 0, 1, 0) -- a small lock here would overlap bob's 48 x 48 area
+	idle(a)
+	local red, bobs = 0, 0
+	for _, e in ipairs(M.entities) do
+		local t = e.opts.visual_override.texture
+		if t == "textures/border_blocked.png" then
+			red = red + 1
+		elseif t == "textures/border_big.png" then
+			bobs = bobs + 1
+		end
+	end
+	truthy(red > 0, "the preview is red")
+	truthy(bobs > 0, "bob's lock is shown")
+	-- placing where it is allowed: the preview gives way to the real lock's posts
+	aim(-30, 63, -30, 0, 1, 0)
+	idle(a)
+	M.click(a, "secondary")
+	truthy(require("game.locks").at_block(-30, 64, -30))
+	idle(a)
+	for _, e in ipairs(M.entities) do
+		falsy(e.opts.visual_override.texture == "textures/border_blocked.png")
+	end
+end)

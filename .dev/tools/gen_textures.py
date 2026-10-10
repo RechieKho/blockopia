@@ -182,6 +182,7 @@ def main():
     for tier, color in lock_colors.items():
         lock(tier, color)
         border_post(tier, color)
+    border_post("blocked", (225, 60, 50))  # the preview where a lock cannot go
 
 
 if __name__ == "__main__":
