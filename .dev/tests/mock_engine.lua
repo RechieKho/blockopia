@@ -229,7 +229,7 @@ function M.load(opts)
 	M.blocks, M.block_by_id, M.aim, M.next_id = {}, {}, nil, 1
 	M.db = opts.db or {}
 	M.storage = opts.storage and floatify(opts.storage) or {}
-	M.pipeline, M.keybinds, M.biomes = nil, {}, {}
+	M.pipeline, M.keybinds, M.biomes, M.entity_kinds, M.entities = nil, {}, {}, {}, {}
 	M.auth_required = opts.auth_required or false
 
 	vb = {
@@ -272,7 +272,9 @@ function M.load(opts)
 		register_keybind = function(name)
 			M.keybinds[name] = true
 		end,
-		register_entity = function() end,
+		register_entity = function(def)
+			M.entity_kinds[def.name] = def
+		end,
 		on = function(event, fn)
 			M.handlers[event] = M.handlers[event] or {}
 			table.insert(M.handlers[event], fn)
@@ -335,6 +337,20 @@ function M.load(opts)
 				end
 				local a = M.aim
 				return { hit = true, x = a.x, y = a.y, z = a.z, nx = a.nx or 0, ny = a.ny or 0, nz = a.nz or 0 }
+			end,
+			spawn = function(kind, pos, opts)
+				assert(M.entity_kinds[kind], "unknown entity kind " .. tostring(kind))
+				local e = { kind = kind, x = pos.x, y = pos.y, z = pos.z, opts = opts }
+				function e.remove(self)
+					for i, other in ipairs(M.entities) do
+						if other == self then
+							table.remove(M.entities, i)
+							return
+						end
+					end
+				end
+				M.entities[#M.entities + 1] = e
+				return e
 			end,
 			spawn_item_drop = function(pos, item, count)
 				M.drops[#M.drops + 1] = { pos = pos, item = item, count = count }

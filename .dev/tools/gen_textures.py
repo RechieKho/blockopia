@@ -106,6 +106,28 @@ def lock(tier, color):
     save("lock_" + tier, img)
 
 
+def border_post(tier, color):
+    # bp:border sprite sheet (entities/border.lua): variant "tall" = 128 x 256 frames, 4 facings
+    # mirrored = 3 rows, one frame. A pole in the lock tier's colour with a pennant, the same from
+    # every side; transparent around it.
+    fw, fh, rows = 128, 256, 3
+    img = Image.new("RGBA", (fw, fh * rows), (0, 0, 0, 0))
+    dark = shade(color, -70)
+    for r in range(rows):
+        top = r * fh
+        for y in range(top + 20, top + fh):
+            for x in range(44, 84):
+                edge = x in (44, 45, 46, 81, 82, 83)
+                band = ((y - top) // 24) % 2 == 0
+                c = dark if edge else (color if band else shade(color, 45))
+                img.putpixel((x, y), c + (255,))
+        for y in range(top + 20, top + 76):  # pennant
+            width = int(44 * (1 - abs((y - top) - 48) / 28.0))
+            for x in range(84, 84 + max(0, min(width, 44))):
+                img.putpixel((x, y), shade(color, 25) + (255,))
+    img.save(os.path.join(OUT, "border_%s.png" % tier))
+
+
 def vending(key, color):
     img = noisy(color, key, 6)
     border(img, shade(color, -50))
@@ -159,6 +181,7 @@ def main():
             vending(key, color)
     for tier, color in lock_colors.items():
         lock(tier, color)
+        border_post(tier, color)
 
 
 if __name__ == "__main__":

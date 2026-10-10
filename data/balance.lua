@@ -67,4 +67,8 @@ return {
 	ledger_keep = 2000,
 
 	lava_damage = 8,
+
+	-- Lock area markers (game/borders.lua): how long they stay and about how many posts per lock.
+	lock_border_seconds = 20,
+	lock_border_posts = 64,
 }

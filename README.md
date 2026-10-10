@@ -53,7 +53,8 @@ In game: **E** opens the menu, **left click** punches, **right click** places a 
 | `!ledger`, `!mute`, `!ban`, `!unban`, `!removelock` | moderators only |
 
 Use the **wrench** (right click) on a shrub to see its growth, on a lock to manage access, on a
-vending machine to buy or manage it.
+vending machine to buy or manage it. Placing, wrenching or resizing a lock marks its area with posts
+in the lock's colour for 20 seconds.
 
 ## Sign-in (Keycloak)
 

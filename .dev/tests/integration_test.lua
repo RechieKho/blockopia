@@ -902,3 +902,46 @@ test("leaving saves the player, and timers skip them afterwards", function()
 	eq(account(a2).coins, 345)
 	truthy(M.count(b, "bp:dirt") > 0, "bob is untouched")
 end)
+
+test("a lock's area is marked with posts for a while when placed, wrenched or resized", function()
+	fresh()
+	local a = dev("alice")
+	a:give({ item = M.id("bp:lock_big"), count = 1 })
+	M.select(a, "bp:lock_big")
+	aim(0, 63, 0, 0, 1, 0)
+	M.click(a, "secondary")
+	local lock = require("game.locks").at_block(0, 64, 0)
+	truthy(lock)
+	truthy(#M.entities >= 4, "posts appear when the lock is placed")
+	for _, e in ipairs(M.entities) do
+		eq(e.kind, "bp:border")
+		eq(e.opts.visual_override.texture, "textures/border_big.png")
+		eq(e.y, 64, "standing on the ground")
+		local on_x = e.x == lock.box.x1 or e.x == lock.box.x2 + 1
+		local on_z = e.z == lock.box.z1 or e.z == lock.box.z2 + 1
+		truthy(on_x or on_z, "on the outline")
+	end
+	M.advance(balance.lock_border_seconds + 1)
+	eq(#M.entities, 0, "and go away again")
+	-- the wrench shows them again; shrinking the lock moves them in
+	M.select(a, "bp:wrench")
+	aim(0, 64, 0)
+	M.click(a, "secondary")
+	eq(a.ui.name, "bp:lock")
+	local before = #M.entities
+	truthy(before > 0)
+	M.ui_event(a, "lock_size", { delta = -20 })
+	truthy(#M.entities > 0 and #M.entities <= before)
+	for _, e in ipairs(M.entities) do
+		truthy(math.abs(e.x) <= 14 and math.abs(e.z) <= 14, "the smaller square")
+	end
+	-- breaking the lock removes them at once
+	M.select(a, "bp:wrench")
+	aim(0, 64, 0)
+	for _ = 1, 4 do
+		M.click(a, "primary")
+		M.advance(1)
+	end
+	falsy(require("game.locks").at_block(0, 64, 0))
+	eq(#M.entities, 0)
+end)
