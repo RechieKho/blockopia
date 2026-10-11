@@ -54,3 +54,31 @@ test("duration text", function()
 	eq(farm.format_duration(125), "2m 5s")
 	eq(farm.format_duration(7300), "2h 1m")
 end)
+
+test("shrub timer labels: whole units left, every label is drawn", function()
+	eq(farm.label(0), "Ripe!")
+	eq(farm.label(-3), "Ripe!")
+	eq(farm.label(0.2), "1s")
+	eq(farm.label(59), "59s")
+	eq(farm.label(59.5), "1m")
+	eq(farm.label(119), "1m")
+	eq(farm.label(120), "2m")
+	eq(farm.label(3599), "59m")
+	eq(farm.label(3600), "1h")
+	eq(farm.label(7199), "1h")
+	eq(farm.label(10 ^ 9), farm.LABEL_MAX_HOURS .. "h")
+	local seen = {}
+	for _, text in ipairs(farm.label_texts()) do
+		seen[text] = true
+	end
+	for left = 0, 200000, 7 do
+		truthy(seen[farm.label(left)], "label for " .. left .. "s is drawn")
+	end
+	local slowest = 0
+	for _, e in ipairs(items) do
+		if e.kind == "species" then
+			slowest = math.max(slowest, farm.grow_seconds(e.rarity, b.grow_scale))
+		end
+	end
+	truthy(slowest < farm.LABEL_MAX_HOURS * 3600, "the slowest species fits the labels")
+end)

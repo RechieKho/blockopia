@@ -30,7 +30,7 @@ function M.open(player)
 	end
 	table.sort(recipes)
 	ui_events.set_context(player, { screen = "bp:almanac" })
-	player:open_ui("bp:almanac", { species = species, recipes = recipes })
+	require("game.ui_events").open(player, "bp:almanac", { species = species, recipes = recipes })
 end
 
 return M

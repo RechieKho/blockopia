@@ -24,7 +24,7 @@ end
 -- Replaces whatever screen is open with a simple message box.
 function M.notice(player, title, text)
 	require("game.ui_events").set_context(player, { screen = "bp:notice" })
-	player:open_ui("bp:notice", { title = title, text = text })
+	require("game.ui_events").open(player, "bp:notice", { title = title, text = text })
 end
 
 function M.forget(player)

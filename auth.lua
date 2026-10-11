@@ -7,7 +7,8 @@
 --   [auth]
 --   issuer    = "https://id.example.com/realms/blockopia"
 --   client_id = "blockopia-game"
--- For local development without Keycloak run the server with --insecure-skip-auth.
+-- For local development without Keycloak run .dev/tools/play_local.sh (singleplayer on a copy
+-- of the pack without this file).
 return {
 	provider = "keycloak",
 	display_name = "Blockopia",

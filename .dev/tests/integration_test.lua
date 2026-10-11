@@ -1,6 +1,7 @@
 -- Loads the whole pack into the mock engine (tests/mock_engine.lua) and plays it.
 local M = require("tests.mock_engine")
 local wn = require("lib.worldname")
+local balance = require("data.balance")
 
 local function fresh(opts)
 	M.load(opts)
@@ -56,6 +57,15 @@ test("the pack loads: blocks, worldgen, keybind, id order saved", function()
 	truthy(M.blocks["bp:dirt"] and M.blocks["bp:dirt_seed"] and M.blocks["bp:crystal_s2"] and M.blocks["bp:lock_grand"])
 	eq(M.blocks["bp:dirt"].max_damage, 2)
 	truthy(M.pipeline and M.pipeline.veins[1].block == "bp:lava")
+	for _, vein in ipairs(M.pipeline.veins) do
+		truthy(M.blocks[vein.block] and M.blocks[vein.target_rock], "vein blocks exist: " .. vein.block)
+	end
+	-- warps drop players from above the highest hill
+	truthy(M.pipeline.base_height + M.pipeline.amplitude < balance.world_spawn_y)
+	truthy(#M.biomes >= 2)
+	for _, biome in ipairs(M.biomes) do
+		truthy(M.blocks[biome.surface] and M.blocks[biome.filler] and M.blocks[biome.stone], biome.name)
+	end
 	truthy(M.keybinds["base:inventory"])
 	truthy(M.blocks["bp:lava"].region)
 end)
@@ -282,6 +292,54 @@ test("breaking the soil destroys the shrub on it", function()
 	eq(require("game.farm").get(8, 64, 8), nil)
 end)
 
+test("shrubs near a player show how long they have left, then Ripe!", function()
+	fresh()
+	local a = dev("alice")
+	local labels = require("game.shrub_labels")
+	local farm_lib = require("lib.farm")
+	M.select(a, "bp:dirt_seed")
+	aim(5, 63, 5, 0, 1, 0)
+	M.click(a, "secondary")
+	local total = require("game.farm").get(5, 64, 5).total
+	M.advance(1)
+	eq(#M.entities, 1)
+	local e = M.entities[1]
+	eq(e.kind, "bp:shrub_timer")
+	truthy(e.x == 5.5 and e.z == 5.5 and math.abs(e.y - 65.05) < 1e-9, "just above the shrub")
+	local text = labels.text_at(5, 64, 5)
+	local whole = math.floor(total)
+	truthy(text == (whole - 1) .. "s" or text == whole .. "s", tostring(text))
+	eq(e.opts.visual_override.texture, farm_lib.label_texture(text))
+	M.advance(5)
+	local later = labels.text_at(5, 64, 5)
+	truthy(later ~= text, "the label counts down")
+	eq(#M.entities, 1, "the old label was replaced")
+	M.advance(total)
+	eq(labels.text_at(5, 64, 5), "Ripe!")
+	eq(M.entities[1].opts.visual_override.texture, "textures/timer/ripe.png")
+	eq(M.world["5,64,5"], M.id("bp:dirt_s2"), "the block is ripe with its label")
+	-- walking away takes it down; coming back puts it up again
+	a.x, a.z = 200.5, 200.5
+	M.advance(1)
+	eq(#M.entities, 0)
+	a.x, a.z = 0.5, 0.5
+	M.advance(1)
+	eq(#M.entities, 1)
+	-- harvesting removes it at once
+	aim(5, 64, 5)
+	M.click(a, "primary")
+	eq(M.world["5,64,5"], nil)
+	eq(#M.entities, 0)
+	-- every sheet a label can need is in the pack
+	local files = {}
+	for _, name in ipairs(M.listdir("textures/timer")) do
+		files["textures/timer/" .. name] = true
+	end
+	for _, t in ipairs(farm_lib.label_texts()) do
+		truthy(files[farm_lib.label_texture(t)], t)
+	end
+end)
+
 test("a small lock protects its square and nothing else", function()
 	fresh()
 	local a, b = dev("alice"), dev("bob")
@@ -335,7 +393,7 @@ test("locks cannot overlap other people's locks", function()
 	eq(M.count(b, "bp:lock_small"), 1, "the lock item is kept")
 end)
 
-test("a grand lock covers exactly 1024 x 1024 around the lock", function()
+test("a grand lock covers exactly one world's size around the lock", function()
 	fresh()
 	local a, b = dev("alice"), dev("bob")
 	local locks = require("game.locks")
@@ -345,12 +403,13 @@ test("a grand lock covers exactly 1024 x 1024 around the lock", function()
 	M.click(a, "secondary")
 	local lock = locks.at_block(3000, 64, -700)
 	truthy(lock)
-	eq(lock.size, 1024)
-	eq(lock.box.x2 - lock.box.x1 + 1, 1024)
-	truthy(not locks.can_build(account(b), 3000 + 511, -700 + 511))
-	truthy(locks.can_build(account(b), 3000 + 512, -700))
-	truthy(locks.can_build(account(b), 3000 - 513, -700))
-	truthy(locks.can_build(account(a), 3000 + 300, -700))
+	local size = balance.world_cell_size
+	eq(lock.size, size)
+	eq(lock.box.x2 - lock.box.x1 + 1, size)
+	truthy(not locks.can_build(account(b), 3000 + size // 2 - 1, -700 + size // 2 - 1))
+	truthy(locks.can_build(account(b), 3000 + size // 2, -700))
+	truthy(locks.can_build(account(b), 3000 - size // 2 - 1, -700))
+	truthy(locks.can_build(account(a), 3000 + size // 4, -700))
 	-- the grand lock cannot be resized from its screen
 	M.select(a, "bp:wrench")
 	aim(3000, 64, -700)
@@ -358,7 +417,7 @@ test("a grand lock covers exactly 1024 x 1024 around the lock", function()
 	eq(a.ui.name, "bp:lock")
 	eq(a.ui.ctx.adjustable, false)
 	M.ui_event(a, "lock_size", { delta = -10 })
-	eq(locks.at_block(3000, 64, -700).size, 1024)
+	eq(locks.at_block(3000, 64, -700).size, size)
 end)
 
 test("the lock screen: resize, admins, public building, and who may edit", function()
@@ -608,19 +667,19 @@ test("the store sells locks and seed packs for coins", function()
 	truthy(ledger.economy().burned >= 90)
 end)
 
-test("warping lands in the same cell for the same name (death-and-respawn fallback)", function()
+test("warping lands in the same cell for the same name", function()
 	fresh()
 	local a = dev("alice")
 	M.chat(a, "!warp my world!")
 	local name = wn.normalize("my world!", 24)
 	local by_name, by_cell = {}, {}
-	wn.assign("START", by_name, by_cell, 256, "START")
-	local idx = wn.assign(name, by_name, by_cell, 256, "START")
-	local cx, cz = wn.center_of(idx, 1024, 256)
+	wn.assign("START", by_name, by_cell, balance.world_grid, "START")
+	local idx = wn.assign(name, by_name, by_cell, balance.world_grid, "START")
+	local cx, cz = wn.center_of(idx, balance.world_cell_size, balance.world_grid)
 	eq(a.x, cx + 0.5)
 	eq(a.z, cz + 0.5)
-	eq(a.y, 100)
-	eq(a.health, 20, "healed after the fake death")
+	eq(a.y, balance.world_spawn_y)
+	eq(a.deaths, nil, "teleported, not killed")
 	local b = dev("bob")
 	M.chat(b, "!warp MYWORLD")
 	eq(b.x, a.x)
@@ -629,14 +688,6 @@ test("warping lands in the same cell for the same name (death-and-respawn fallba
 	truthy(has_message(a, "MYWORLD"))
 	M.advance(4)
 	truthy(has_message(a, "world=MYWORLD"))
-end)
-
-test("warping uses Player:set_pos when the engine has it", function()
-	fresh({ set_pos = true })
-	local a = dev("alice")
-	M.chat(a, "!warp hello")
-	truthy(a.x ~= 0.5)
-	eq(a.deaths, nil)
 end)
 
 test("a bad world name is refused", function()
@@ -648,11 +699,11 @@ test("a bad world name is refused", function()
 end)
 
 test("the world owner can move the arrival point", function()
-	fresh({ set_pos = true })
+	fresh()
 	local a = dev("alice")
 	M.chat(a, "!warp farm")
-	local idx = wn.assign("FARM", {}, {}, 256, "START")
-	local cx, cz = wn.center_of(wn.assign("FARM", {}, {}, 256, "START"), 1024, 256)
+	local idx = wn.assign("FARM", {}, {}, balance.world_grid, "START")
+	local cx, cz = wn.center_of(idx, balance.world_cell_size, balance.world_grid)
 	a.x, a.y, a.z = cx + 3, 70, cz + 3
 	M.chat(a, "!setspawn")
 	truthy(has_message(a, "Only the owner"))
@@ -800,4 +851,206 @@ test("the economy is logged", function()
 	truthy(ledger.format(recent[1]):find("100 coins", 1, true))
 	eq(ledger.economy().minted, 100)
 	truthy(a)
+end)
+
+test("E opens the menu, but not while a screen is open (typing 'e' into a text field)", function()
+	fresh()
+	local a = dev("alice")
+	local function press_e()
+		M.input(a, { menu = true })
+		M.input(a, {})
+	end
+	press_e()
+	eq(a.ui.name, "bp:menu")
+	M.ui_event(a, "menu_open", { screen = "warp" })
+	eq(a.ui.name, "bp:warp")
+	local opened = #a.ui_log
+	press_e() -- typing "MYWORLDE" into the warp screen's name field
+	eq(#a.ui_log, opened, "E while the warp screen is open must not reopen the menu")
+	eq(a.ui.name, "bp:warp")
+	M.ui_event(a, "close", nil)
+	press_e()
+	eq(a.ui.name, "bp:menu", "E works again once the screen is closed")
+	eq(#a.ui_log, opened + 1)
+end)
+
+test("E does not open the menu while the chat box is open", function()
+	fresh()
+	local a = dev("alice")
+	local function press_e()
+		M.input(a, { menu = true })
+		M.input(a, {})
+	end
+	M.ui_event(a, "hud_chat", { open = true }, "")
+	press_e() -- typing "hello" into the chat box
+	eq(a.ui, nil, "E while chatting must not open the menu")
+	M.ui_event(a, "hud_chat", { open = false }, "")
+	press_e()
+	eq(a.ui.name, "bp:menu")
+	-- junk from the client is ignored
+	M.ui_event(a, "hud_chat", "yes", "")
+	M.ui_event(a, "close", nil)
+	press_e()
+	eq(#a.ui_log, 2)
+end)
+
+test("the warp loading screen closes itself once the player has landed", function()
+	fresh()
+	local a = dev("alice")
+	local function done()
+		return a.ui.name == "bp:loading" and a.ui.ctx.done == true
+	end
+	M.chat(a, "!warp landing")
+	eq(a.ui.name, "bp:loading")
+	eq(a.ui.ctx.world, "LANDING")
+	M.advance(2, 0.25) -- still falling: nothing under the player at the spawn height
+	falsy(done())
+	-- lands on the ground at the destination
+	local gx, gz = math.floor(a.x), math.floor(a.z)
+	M.world[gx .. "," .. 63 .. "," .. gz] = M.id("bp:grass")
+	a.y = 64
+	M.advance(0.25, 0.25)
+	falsy(done(), "needs a steady height first")
+	M.advance(1, 0.25)
+	truthy(done(), "reopened with done = true, which closes it on the client")
+	M.ui_event(a, "close", nil)
+	local opened = #a.ui_log
+	M.advance(20, 0.5)
+	eq(#a.ui_log, opened, "only once")
+end)
+
+test("the warp loading screen times out, and never replaces another screen", function()
+	fresh()
+	local a = dev("alice")
+	M.chat(a, "!warp nowhere")
+	eq(a.ui.name, "bp:loading")
+	M.advance(16, 0.5) -- never lands
+	eq(a.ui.ctx.done, true)
+	M.ui_event(a, "close", nil)
+	-- the player opens the menu while still loading: the menu stays
+	M.chat(a, "!warp elsewhere")
+	M.chat(a, "!menu")
+	local opened = #a.ui_log
+	M.advance(16, 0.5)
+	eq(a.ui.name, "bp:menu")
+	eq(#a.ui_log, opened)
+end)
+
+test("leaving saves the player, and timers skip them afterwards", function()
+	fresh()
+	local a, b = dev("alice"), dev("bob")
+	a:give({ item = M.id("bp:gold"), count = 7 })
+	account(a).coins = 345
+	M.leave(a)
+	-- timers keep running: shrub sweep, inventory autosave, HUD, warp arrivals
+	M.advance(65, 0.5)
+	truthy(not require("game.accounts").online("alice"), "alice is no longer online")
+	local a2 = dev("alice")
+	eq(M.count(a2, "bp:gold"), 7, "inventory survived the leave and the autosave after it")
+	eq(account(a2).coins, 345)
+	truthy(M.count(b, "bp:dirt") > 0, "bob is untouched")
+end)
+
+test("a lock's area is marked with posts for a while when placed, wrenched or resized", function()
+	fresh()
+	local a = dev("alice")
+	a:give({ item = M.id("bp:lock_big"), count = 1 })
+	M.select(a, "bp:lock_big")
+	aim(0, 63, 0, 0, 1, 0)
+	M.click(a, "secondary")
+	local lock = require("game.locks").at_block(0, 64, 0)
+	truthy(lock)
+	truthy(#M.entities >= 4, "posts appear when the lock is placed")
+	for _, e in ipairs(M.entities) do
+		eq(e.kind, "bp:border")
+		eq(e.opts.visual_override.texture, "textures/border_big.png")
+		eq(e.y, 64, "standing on the ground")
+		local on_x = e.x == lock.box.x1 or e.x == lock.box.x2 + 1
+		local on_z = e.z == lock.box.z1 or e.z == lock.box.z2 + 1
+		truthy(on_x or on_z, "on the outline")
+	end
+	M.advance(balance.lock_border_seconds + 1)
+	eq(#M.entities, 0, "and go away again")
+	-- the wrench shows them again; shrinking the lock moves them in
+	M.select(a, "bp:wrench")
+	aim(0, 64, 0)
+	M.click(a, "secondary")
+	eq(a.ui.name, "bp:lock")
+	local before = #M.entities
+	truthy(before > 0)
+	M.ui_event(a, "lock_size", { delta = -20 })
+	truthy(#M.entities > 0 and #M.entities <= before)
+	for _, e in ipairs(M.entities) do
+		truthy(math.abs(e.x) <= 14 and math.abs(e.z) <= 14, "the smaller square")
+	end
+	-- breaking the lock removes them at once
+	M.select(a, "bp:wrench")
+	aim(0, 64, 0)
+	for _ = 1, 4 do
+		M.click(a, "primary")
+		M.advance(1)
+	end
+	falsy(require("game.locks").at_block(0, 64, 0))
+	eq(#M.entities, 0)
+end)
+
+test("holding a lock previews its area where it would go, red where it cannot", function()
+	fresh()
+	local a, b = dev("alice"), dev("bob")
+	local function idle(p)
+		M.advance(0.2, 0.2)
+		M.input(p, {})
+	end
+	a:give({ item = M.id("bp:lock_small"), count = 1 })
+	M.select(a, "bp:lock_small")
+	aim(0, 63, 0, 0, 1, 0)
+	idle(a)
+	local posts = {}
+	for _, e in ipairs(M.entities) do
+		posts[#posts + 1] = e
+		eq(e.opts.visual_override.texture, "textures/border_small.png")
+	end
+	truthy(#posts >= 4, "a preview ring around the aimed spot")
+	-- aiming elsewhere moves the same posts instead of spawning new ones
+	aim(6, 63, 0, 0, 1, 0)
+	idle(a)
+	eq(#M.entities, #posts)
+	truthy(posts[1].moves > 0)
+	for _, e in ipairs(M.entities) do
+		truthy(e.x >= 6 - 5 and e.x <= 6 + 6, "follows the new spot")
+	end
+	-- bob owns a lock nearby: aiming into it turns the ring red and shows bob's lock
+	M.select(a, "bp:wrench")
+	idle(a)
+	eq(#M.entities, 0, "no preview without a lock in hand")
+	b:give({ item = M.id("bp:lock_big"), count = 1 })
+	M.select(b, "bp:lock_big")
+	aim(30, 63, 30, 0, 1, 0)
+	M.click(b, "secondary")
+	M.select(b, "bp:wrench")
+	M.advance(balance.lock_border_seconds + 1)
+	eq(#M.entities, 0)
+	M.select(a, "bp:lock_small")
+	aim(10, 63, 10, 0, 1, 0) -- a small lock here would overlap bob's 48 x 48 area
+	idle(a)
+	local red, bobs = 0, 0
+	for _, e in ipairs(M.entities) do
+		local t = e.opts.visual_override.texture
+		if t == "textures/border_blocked.png" then
+			red = red + 1
+		elseif t == "textures/border_big.png" then
+			bobs = bobs + 1
+		end
+	end
+	truthy(red > 0, "the preview is red")
+	truthy(bobs > 0, "bob's lock is shown")
+	-- placing where it is allowed: the preview gives way to the real lock's posts
+	aim(-30, 63, -30, 0, 1, 0)
+	idle(a)
+	M.click(a, "secondary")
+	truthy(require("game.locks").at_block(-30, 64, -30))
+	idle(a)
+	for _, e in ipairs(M.entities) do
+		falsy(e.opts.visual_override.texture == "textures/border_blocked.png")
+	end
 end)

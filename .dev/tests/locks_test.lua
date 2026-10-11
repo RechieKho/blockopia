@@ -102,3 +102,26 @@ test("removal clears the index", function()
 	idx:remove(1)
 	eq(#idx:at(0, 0), 0)
 end)
+
+test("border posts follow a lock's outline, corners included, about 64 per lock", function()
+	local borders = require("game.borders")
+	for _, size in ipairs({ 1, 10, 48, 200, 256 }) do
+		local box = L.box_of(0, 0, size)
+		local pts = borders.outline(box, 64)
+		truthy(#pts >= 4 and #pts <= 72, size .. ": " .. #pts .. " posts")
+		local corners = {}
+		for _, p in ipairs(pts) do
+			local on_x = p.x == box.x1 or p.x == box.x2 + 1
+			local on_z = p.z == box.z1 or p.z == box.z2 + 1
+			truthy(on_x or on_z, "on the outline")
+			if on_x and on_z then
+				corners[p.x .. "," .. p.z] = true
+			end
+		end
+		local n = 0
+		for _ in pairs(corners) do
+			n = n + 1
+		end
+		eq(n, 4, size .. ": all four corners")
+	end
+end)

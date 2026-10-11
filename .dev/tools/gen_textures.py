@@ -70,20 +70,25 @@ def seed(key, color):
 
 
 def shrub(key, color, stage):
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    green = (60, 150, 60, 255)
-    height = (4, 9, 14)[stage]
-    for y in range(SIZE - height, SIZE):
-        img.putpixel((8, y), green)
-    for i in range(1, stage + 2):
-        y = SIZE - 2 - i * 3
-        if y >= 0:
-            for dx in (-2, -1, 1, 2):
-                img.putpixel((8 + dx, y), green)
-    if stage == 2:  # ripe: fruit in the species colour
-        for (x, y) in ((6, 2), (10, 3), (7, 5), (9, 6), (8, 1)):
-            img.putpixel((x, y), color + (255,))
-            img.putpixel((x + 1, y), color + (255,))
+    # A leafy bush filling the block: leaves get denser as it grows, and a ripe one shows fruit in
+    # the species colour. Fully opaque: engines before 0.1.5 had no alpha cutout, so clear texels
+    # showed holes of sky through the terrain behind.
+    rng = random.Random("%s_s%d" % (key, stage))
+    shadow = (28, 74, 32)
+    leaf = ((92, 178, 84), (70, 156, 64), (58, 138, 56))[stage]
+    density = (0.35, 0.6, 0.8)[stage]
+    img = Image.new("RGBA", (SIZE, SIZE), shadow + (255,))
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if rng.random() < density:
+                img.putpixel((x, y), shade(leaf, rng.randint(-18, 18)) + (255,))
+    border(img, shade(shadow, -12))
+    if stage == 2:
+        dark = shade(color, -70)
+        for (x, y) in ((3, 3), (10, 2), (6, 7), (12, 8), (3, 11), (9, 12)):
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                img.putpixel((x + dx, y + dy), color + (255,))
+            img.putpixel((x + 1, y + 1), dark + (255,))
     save("%s_s%d" % (key, stage), img)
 
 
@@ -99,6 +104,98 @@ def lock(tier, color):
             img.putpixel((x, y), (40, 40, 40, 255))
     img.putpixel((8, 10), color + (255,))
     save("lock_" + tier, img)
+
+
+def border_post(tier, color):
+    # bp:border sprite sheet (entities/border.lua): variant "tall" = 128 x 256 frames, 4 facings
+    # mirrored = 3 rows, one frame. A pole in the lock tier's colour with a pennant, the same from
+    # every side; transparent around it.
+    fw, fh, rows = 128, 256, 3
+    img = Image.new("RGBA", (fw, fh * rows), (0, 0, 0, 0))
+    dark = shade(color, -70)
+    for r in range(rows):
+        top = r * fh
+        for y in range(top + 20, top + fh):
+            for x in range(44, 84):
+                edge = x in (44, 45, 46, 81, 82, 83)
+                band = ((y - top) // 24) % 2 == 0
+                c = dark if edge else (color if band else shade(color, 45))
+                img.putpixel((x, y), c + (255,))
+        for y in range(top + 20, top + 76):  # pennant
+            width = int(44 * (1 - abs((y - top) - 48) / 28.0))
+            for x in range(84, 84 + max(0, min(width, 44))):
+                img.putpixel((x, y), shade(color, 25) + (255,))
+    img.save(os.path.join(OUT, "border_%s.png" % tier))
+
+
+# 5 x 7 pixel font for the shrub timer labels: just the characters they use.
+GLYPHS = {
+    "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+    "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+    "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+    "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+    "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+    "5": ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+    "6": ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+    "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+    "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+    "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+    "s": ["00000", "00000", "01111", "10000", "01110", "00001", "11110"],
+    "m": ["00000", "00000", "11010", "10101", "10101", "10101", "10101"],
+    "h": ["10000", "10000", "10110", "11001", "10001", "10001", "10001"],
+    "R": ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+    "i": ["00100", "00000", "01100", "00100", "00100", "00100", "01110"],
+    "p": ["00000", "00000", "11110", "10001", "11110", "10000", "10000"],
+    "e": ["00000", "00000", "01110", "10001", "11111", "10000", "01110"],
+    "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
+}
+LABEL_MAX_HOURS = 99
+
+
+def label_texts():
+    # Must match lib/farm.lua's label_texts().
+    return (["Ripe!"] + ["%ds" % n for n in range(1, 60)] + ["%dm" % n for n in range(1, 60)]
+            + ["%dh" % n for n in range(1, LABEL_MAX_HOURS + 1)])
+
+
+def draw_label(img, left, top, fw, fh, text):
+    # A dark rounded tag with the text in white (green for "Ripe!"), centred low in the frame.
+    gap, pad = 2, 14
+    scale = min(9, (fw - 2 * pad - 4) // (len(text) * (5 + gap) - gap))  # "Ripe!" is drawn smaller
+    ink = (120, 235, 110, 255) if text == "Ripe!" else (255, 255, 255, 255)
+    text_w = len(text) * (5 + gap) * scale - gap * scale
+    w, h = text_w + 2 * pad, 7 * scale + 2 * pad
+    x0, y0 = left + (fw - w) // 2, top + fh - h - 2
+    for y in range(h):
+        for x in range(w):
+            corner = min(x, w - 1 - x) < 6 and min(y, h - 1 - y) < 6 and \
+                (min(x, w - 1 - x) - 6) ** 2 + (min(y, h - 1 - y) - 6) ** 2 > 36
+            if not corner:
+                edge = min(x, w - 1 - x, y, h - 1 - y) < 3
+                img.putpixel((x0 + x, y0 + y), (15, 15, 15, 255) if edge else (45, 45, 45, 255))
+    cx = x0 + pad
+    for ch in text:
+        for gy, row in enumerate(GLYPHS[ch]):
+            for gx, bit in enumerate(row):
+                if bit == "1":
+                    for yy in range(scale):
+                        for xx in range(scale):
+                            img.putpixel((cx + gx * scale + xx, y0 + pad + gy * scale + yy), ink)
+        cx += (5 + gap) * scale
+
+
+def shrub_timers():
+    # bp:shrub_timer labels (entities/shrub_timer.lua), one texture per text: variant "flat" =
+    # 256 x 128 frame, 4 facings mirrored = 3 identical rows.
+    fw, fh, rows = 256, 128, 3
+    out = os.path.join(OUT, "timer")
+    os.makedirs(out, exist_ok=True)
+    for text in label_texts():
+        img = Image.new("RGBA", (fw, fh * rows), (0, 0, 0, 0))
+        for r in range(rows):
+            draw_label(img, 0, r * fh, fw, fh, text)
+        name = "ripe" if text == "Ripe!" else text
+        img.save(os.path.join(out, name + ".png"), optimize=True)
 
 
 def vending(key, color):
@@ -154,6 +251,9 @@ def main():
             vending(key, color)
     for tier, color in lock_colors.items():
         lock(tier, color)
+        border_post(tier, color)
+    border_post("blocked", (225, 60, 50))  # the preview where a lock cannot go
+    shrub_timers()
 
 
 if __name__ == "__main__":

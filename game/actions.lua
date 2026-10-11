@@ -13,6 +13,7 @@ local balance = require("data.balance")
 local M = {}
 
 local was_down, was_secondary, was_menu = {}, {}, {}
+local last_preview = {} -- player name -> game time of the last lock preview update
 local last_swing = {} -- player name -> game time of the last shrub punch
 
 -- Left click. The engine's punch only sees solid blocks, so a shrub in the line of sight is broken
@@ -82,6 +83,38 @@ local function secondary(player, acc, input)
 	end
 end
 
+-- While the player holds a lock: a preview ring where it would be placed (red when it cannot be),
+-- and the other players' locks in the way. Updated at most every balance.lock_preview_seconds.
+local function lock_preview(player, acc, input)
+	local borders = require("game.borders")
+	local held = player:get_held_item()
+	local meta = held and ids.meta(held.item)
+	if not meta or meta.kind ~= "lock" then
+		borders.clear_preview(player)
+		return
+	end
+	local name, now = player:get_name(), store.now()
+	if now - (last_preview[name] or -1) < balance.lock_preview_seconds then
+		return
+	end
+	last_preview[name] = now
+	local hit = M.pick(player, input)
+	if not hit then
+		borders.clear_preview(player)
+		return
+	end
+	local x, y, z = hit.x + hit.nx, hit.y + hit.ny, hit.z + hit.nz
+	local ok = placing.can_place(acc, meta, x, y, z)
+	borders.preview(player, meta.tier, x, y, z, not ok)
+	if not ok then
+		for _, lock in ipairs(require("game.locks").blockers(acc, meta.tier, x, z)) do
+			if not borders.is_shown(lock.id) then
+				borders.show(lock)
+			end
+		end
+	end
+end
+
 -- player_input handler. Never changes movement.
 function M.on_input(player, input)
 	local acc = session.touch(player)
@@ -96,14 +129,19 @@ function M.on_input(player, input)
 	end
 	was_down[name] = down
 
+	lock_preview(player, acc, input)
+
 	local sec = input.buttons and input.buttons.secondary or false
 	if sec and not was_secondary[name] then
 		secondary(player, acc, input)
 	end
 	was_secondary[name] = sec
 
+	-- E opens the menu, but not while one of our screens or the chat box is open: the client still
+	-- reports the key while the player types "e" into a text field or a chat message.
 	local menu = input.keybinds and input.keybinds["base:inventory"] or false
-	if menu and not was_menu[name] then
+	local ui_events = require("game.ui_events")
+	if menu and not was_menu[name] and not ui_events.screen_open(player) and not ui_events.chatting(player) then
 		require("game.menu").open_menu(player)
 	end
 	was_menu[name] = menu
@@ -112,6 +150,8 @@ end
 function M.forget(player)
 	local name = player:get_name()
 	was_down[name], was_secondary[name], was_menu[name], last_swing[name] = nil, nil, nil, nil
+	last_preview[name] = nil
+	require("game.borders").clear_preview(player)
 end
 
 return M

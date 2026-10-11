@@ -1,0 +1,95 @@
+# Blockopia on one host: the game server, Keycloak (sign-in) with Postgres, and Caddy giving
+# Keycloak HTTPS (the engine only accepts an https issuer).
+#
+#   cd ops/deploy
+#   cp .env.example .env        # set AUTH_DOMAIN, ACME_EMAIL and the passwords
+#   docker compose up -d --build
+#
+# Open on the host / firewall: 80/tcp and 443/tcp (Caddy, certificates and Keycloak) and the game
+# port (UDP, 7777 by default). AUTH_DOMAIN must point at this host in DNS.
+# Players: register at https://AUTH_DOMAIN/realms/blockopia/account, then connect to HOST:7777.
+name: blockopia
+
+services:
+  game:
+    build:
+      context: ../..
+      dockerfile: ops/deploy/Dockerfile
+      args:
+        VB_VERSION: ${VB_VERSION:-v0.1.5}
+    image: blockopia-server:${VB_VERSION:-v0.1.5}
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    environment:
+      AUTH_ISSUER: https://${AUTH_DOMAIN:?set AUTH_DOMAIN in .env}/realms/blockopia
+      AUTH_CLIENT_ID: blockopia-game
+      BLOCKOPIA_NO_AUTH: ${BLOCKOPIA_NO_AUTH:-0}
+      GAME_PORT: ${GAME_PORT:-7777}
+      MAX_PLAYERS: ${MAX_PLAYERS:-32}
+      VIEW_DISTANCE: ${VIEW_DISTANCE:-6}
+      MOTD: ${MOTD:-Welcome to Blockopia}
+      WORLD_SEED: ${WORLD_SEED:-}
+    ports:
+      - "${GAME_PORT:-7777}:${GAME_PORT:-7777}/udp"
+    volumes:
+      - game-data:/data
+    stop_grace_period: 30s # the server saves the world on SIGTERM
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      AUTH_DOMAIN: ${AUTH_DOMAIN:?set AUTH_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      default:
+        # The game server checks tokens against https://AUTH_DOMAIN; inside the compose network
+        # that name leads straight to Caddy (same certificate, no trip through the host).
+        aliases:
+          - ${AUTH_DOMAIN:?set AUTH_DOMAIN in .env}
+    depends_on:
+      - keycloak
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    command: start --import-realm
+    depends_on:
+      - postgres
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      # Behind Caddy: plain HTTP inside the network, public URL and headers from the proxy.
+      KC_HOSTNAME: https://${AUTH_DOMAIN:?set AUTH_DOMAIN in .env}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+    volumes:
+      - ../keycloak/realm-blockopia.json:/opt/keycloak/data/import/realm-blockopia.json:ro
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - keycloak-db:/var/lib/postgresql/data
+
+volumes:
+  game-data:
+  keycloak-db:
+  caddy-data:
+  caddy-config:

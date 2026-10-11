@@ -60,7 +60,7 @@ ui.define("bp:trade", function(state)
 	end
 	bp_ui.button(widgets, "cancel", bx, row + math.floor(134 * k), 140, 34, k, "Cancel trade", function()
 		ui.send_event("trade_cancel", {})
-		ui.close()
+		bp_ui.back_to_game()
 	end)
 	return { widgets = widgets }
 end)

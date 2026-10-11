@@ -46,8 +46,12 @@ function bp_ui.button(widgets, id, x, y, w, h, k, text, on_click)
 		text = text, on_click = on_click }
 end
 
+-- Closes the screen and hands the mouse back to the game (engine 0.1.5+: the click that closed the
+-- screen is not sent as a punch).
+function bp_ui.back_to_game()
+	ui.close({ capture_mouse = true })
+end
+
 function bp_ui.close_button(widgets, x, y, w, k)
-	bp_ui.button(widgets, "close", x + w - math.floor(96 * k), y + math.floor(10 * k), 80, 28, k, "Close", function()
-		ui.close()
-	end)
+	bp_ui.button(widgets, "close", x + w - math.floor(96 * k), y + math.floor(10 * k), 80, 28, k, "Close", bp_ui.back_to_game)
 end

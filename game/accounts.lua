@@ -1,5 +1,5 @@
 -- Accounts, keyed by the Keycloak subject (player:get_login().subject), never by player name.
--- With the engine started without auth (--insecure-skip-auth) there is no login, and the account
+-- Without auth (no auth.lua, e.g. .dev/tools/play_local.sh) there is no login, and the account
 -- key is "dev:<name>" instead.
 local store = require("game.store")
 local ledger = require("game.ledger")
@@ -85,9 +85,23 @@ function M.online(name)
 	return online[name]
 end
 
-function M.each_online()
-	return pairs(online)
+-- False once the engine has dropped the player: their handle then throws on get_pos.
+function M.alive(player)
+	return (pcall(player.get_pos, player))
 end
+
+-- Online players the engine still has. A player whose entity is gone is skipped, so a timer never
+-- acts on a departed player even if it runs before the leave event.
+function M.each_online()
+	local list = {}
+	for name, player in pairs(online) do
+		if M.alive(player) then
+			list[name] = player
+		end
+	end
+	return pairs(list)
+end
+
 
 function M.set_online(player)
 	online[player:get_name()] = player

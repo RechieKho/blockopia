@@ -69,7 +69,18 @@ local function chat(widgets, screen, k)
 	end
 end
 
+-- Tells the server when the chat box opens or closes. The client still reports the E keybind while
+-- the player types into the chat box, and only this VM can see that the box is open.
+local function report_chat(state)
+	local open = client.chat_open() and true or false
+	if state.chat_open ~= open then
+		state.chat_open = open
+		ui.send_event("hud_chat", { open = open })
+	end
+end
+
 ui.define_hud(function(state)
+	report_chat(state)
 	local widgets = {}
 	local screen = client.screen_size()
 	local k = bp_ui.scale()

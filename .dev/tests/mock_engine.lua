@@ -30,6 +30,9 @@ function Player:get_name()
 	return self.name
 end
 function Player:get_pos()
+	if self.gone then
+		error("entity:get_pos(): entity is gone")
+	end
 	return { x = self.x, y = self.y, z = self.z }
 end
 function Player:get_login()
@@ -95,6 +98,9 @@ function Player:get_held_item()
 end
 function Player:get_health()
 	return { current = self.health, max = 20 }
+end
+function Player:set_pos(x, y, z)
+	self.x, self.y, self.z = x, y, z
 end
 function Player:damage(amount, cause)
 	self.health = self.health - amount
@@ -211,7 +217,7 @@ end
 
 -- ---- loading ---------------------------------------------------------------------------
 
--- opts.db / opts.storage carry saved state across a "restart"; opts.set_pos adds Player:set_pos.
+-- opts.db / opts.storage carry saved state across a "restart".
 function M.load(opts)
 	opts = opts or {}
 	for name in pairs(package.loaded) do
@@ -223,15 +229,8 @@ function M.load(opts)
 	M.blocks, M.block_by_id, M.aim, M.next_id = {}, {}, nil, 1
 	M.db = opts.db or {}
 	M.storage = opts.storage and floatify(opts.storage) or {}
-	M.pipeline, M.keybinds = nil, {}
+	M.pipeline, M.keybinds, M.biomes, M.entity_kinds, M.entities = nil, {}, {}, {}, {}
 	M.auth_required = opts.auth_required or false
-	if opts.set_pos then
-		Player.set_pos = function(self, x, y, z)
-			self.x, self.y, self.z = x, y, z
-		end
-	else
-		Player.set_pos = nil
-	end
 
 	vb = {
 		storage = M.storage,
@@ -267,11 +266,15 @@ function M.load(opts)
 			M.block_by_id[id] = def
 			return id
 		end,
-		register_biome = function() end,
+		register_biome = function(def)
+			M.biomes[#M.biomes + 1] = def
+		end,
 		register_keybind = function(name)
 			M.keybinds[name] = true
 		end,
-		register_entity = function() end,
+		register_entity = function(def)
+			M.entity_kinds[def.name] = def
+		end,
 		on = function(event, fn)
 			M.handlers[event] = M.handlers[event] or {}
 			table.insert(M.handlers[event], fn)
@@ -303,6 +306,14 @@ function M.load(opts)
 			constant = function(v)
 				return { constant = v }
 			end,
+			value = function(frequency)
+				assert(frequency == nil or type(frequency) == "number", "vb.noise.value takes a number")
+				return { value = frequency or 1 }
+			end,
+			fbm = function(def)
+				assert(type(def) == "table" and def.source, "vb.noise.fbm needs a source")
+				return { fbm = def }
+			end,
 		},
 		worldgen = {
 			set_pipeline = function(def)
@@ -326,6 +337,23 @@ function M.load(opts)
 				end
 				local a = M.aim
 				return { hit = true, x = a.x, y = a.y, z = a.z, nx = a.nx or 0, ny = a.ny or 0, nz = a.nz or 0 }
+			end,
+			spawn = function(kind, pos, opts)
+				assert(M.entity_kinds[kind], "unknown entity kind " .. tostring(kind))
+				local e = { kind = kind, x = pos.x, y = pos.y, z = pos.z, opts = opts, moves = 0 }
+				function e.set_pos(self, x, y, z)
+					self.x, self.y, self.z, self.moves = x, y, z, self.moves + 1
+				end
+				function e.remove(self)
+					for i, other in ipairs(M.entities) do
+						if other == self then
+							table.remove(M.entities, i)
+							return
+						end
+					end
+				end
+				M.entities[#M.entities + 1] = e
+				return e
 			end,
 			spawn_item_drop = function(pos, item, count)
 				M.drops[#M.drops + 1] = { pos = pos, item = item, count = count }
@@ -402,9 +430,13 @@ function M.join(name, login)
 	return p
 end
 
+-- Like the real engine (0.1.5): player_leave fires with a handle that still knows its name and last
+-- position; afterwards the entity is gone and its inventory erased.
 function M.leave(p)
 	M.fire("player_leave", p)
+	p.gone = true
 	M.players[p.name] = nil
+	p.slots = {}
 end
 
 -- opts: primary / secondary / menu booleans
