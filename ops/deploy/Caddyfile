@@ -1,0 +1,8 @@
+# HTTPS for Keycloak, with a certificate from Let's Encrypt for AUTH_DOMAIN.
+{
+	email {$ACME_EMAIL}
+}
+
+{$AUTH_DOMAIN} {
+	reverse_proxy keycloak:8080
+}

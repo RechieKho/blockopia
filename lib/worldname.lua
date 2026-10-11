@@ -1,4 +1,4 @@
--- World names -> cells of a G x G grid of 1024 x 1024 cells centred on the origin. Pure.
+-- World names -> cells of a G x G grid of square cells centred on the origin. Pure.
 local M = {}
 
 local BLOCKLIST = { "FUCK", "SHIT", "NAZI", "RAPE", "CUNT", "NIGGER", "FAGGOT" }

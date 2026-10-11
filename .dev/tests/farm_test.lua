@@ -54,3 +54,15 @@ test("duration text", function()
 	eq(farm.format_duration(125), "2m 5s")
 	eq(farm.format_duration(7300), "2h 1m")
 end)
+
+test("shrub timer labels: time left, then Ripe!", function()
+	eq(farm.label(0), "Ripe!")
+	eq(farm.label(-3), "Ripe!")
+	eq(farm.label(0.2), "1s")
+	eq(farm.label(59), "59s")
+	eq(farm.label(90), "1m 30s")
+	eq(farm.label(3600 * 35 + 8 * 60), "35h 8m")
+	for left = 0, 200000, 7 do
+		truthy(#farm.label(left) <= 64, "fits the engine's 64-byte label")
+	end
+end)

@@ -30,6 +30,7 @@ function M.touch(player)
 		pending[name] = nil
 		acc.ready = true
 		inventory.restore(player, acc)
+		require("game.wardrobe").apply(player, acc, true)
 		accounts.save(acc)
 		notify.say(player, "Welcome to Blockopia, " .. name .. "! Press E for the menu, or type !help.")
 		require("game.hud").push(player)
@@ -37,7 +38,14 @@ function M.touch(player)
 	return acc
 end
 
-function M.on_leave(player)
+-- player_leave handler: everything that has to happen when a player leaves. Since engine 0.1.5 the
+-- handle still answers get_name() (and get_pos(), with the last position) during this event.
+function M.on_leave_event(player)
+	require("game.trade").on_leave(player)
+	require("game.ui_events").clear(player)
+	require("game.actions").forget(player)
+	require("game.worlds").forget(player)
+	require("game.wardrobe").forget(player)
 	pending[player:get_name()] = nil
 	notify.forget(player)
 	accounts.on_leave(player)

@@ -36,7 +36,7 @@ function M.open(player)
 		list[#list + 1] = { id = e.id, name = name_of(e), price = price_of(e) }
 	end
 	ui_events.set_context(player, { screen = "bp:store" })
-	player:open_ui("bp:store", { coins = acc.coins, items = list })
+	require("game.ui_events").open(player, "bp:store", { coins = acc.coins, items = list })
 end
 
 -- A random seed of a species with rarity <= max_rarity.

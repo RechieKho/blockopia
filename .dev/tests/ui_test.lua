@@ -47,6 +47,7 @@ end
 -- `client` (no `vb`), exactly like the real one.
 local function ui_vm(opts)
 	opts = opts or {}
+	local vm_state = {}
 	local screens, hud = {}, nil
 	local sent = {}
 	local env = {
@@ -63,8 +64,9 @@ local function ui_vm(opts)
 		send_event = function(kind, value)
 			sent[#sent + 1] = { kind = kind, value = value }
 		end,
-		close = function()
+		close = function(opts)
 			sent[#sent + 1] = { kind = "close" }
+			vm_state.closed_with = opts or {}
 		end,
 	}
 	env.client = {
@@ -84,7 +86,7 @@ local function ui_vm(opts)
 			return opts.chat or {}
 		end,
 		chat_open = function()
-			return false
+			return opts.chat_open or false
 		end,
 		break_progress = function()
 			return opts.progress
@@ -108,7 +110,8 @@ local function ui_vm(opts)
 			assert(load(src, "@ui/" .. f, "t", env))()
 		end
 	end
-	return { screens = screens, hud = function() return hud end, sent = sent, env = env }
+	vm_state.screens, vm_state.hud, vm_state.sent, vm_state.env = screens, function() return hud end, sent, env
+	return vm_state
 end
 
 local function render(vm, name, ctx)
@@ -284,4 +287,48 @@ test("the server's hud line parses the way the hud expects", function()
 	eq(fields.coins, "7")
 	eq(fields.world, "A_B_C")
 	eq(fields.owner, "o_w")
+end)
+
+test("the hud tells the server when the chat box opens and closes", function()
+	setup()
+	local opts = {}
+	local vm = ui_vm(opts)
+	local state = {}
+	vm.hud()(state)
+	eq(#vm.sent, 1)
+	eq(vm.sent[1].kind, "hud_chat")
+	eq(vm.sent[1].value.open, false)
+	vm.hud()(state)
+	eq(#vm.sent, 1, "nothing sent while the state is unchanged")
+	opts.chat_open = true
+	vm.hud()(state)
+	eq(vm.sent[2].kind, "hud_chat")
+	eq(vm.sent[2].value.open, true)
+	opts.chat_open = false
+	vm.hud()(state)
+	eq(vm.sent[3].value.open, false)
+end)
+
+test("the loading screen closes itself and recaptures the mouse when the warp is done", function()
+	setup()
+	local vm = ui_vm()
+	local layout = render(vm, "bp:loading", { world = "FARM" })
+	truthy(find(layout, "text").text:find("FARM", 1, true))
+	eq(#vm.sent, 0)
+	layout = render(vm, "bp:loading", { done = true })
+	eq(#layout.widgets, 0)
+	eq(vm.sent[#vm.sent].kind, "close")
+	eq(vm.closed_with.capture_mouse, true)
+end)
+
+test("close buttons hand the mouse back to the game", function()
+	setup()
+	local vm = ui_vm()
+	for _, name in ipairs({ "bp:menu", "bp:store", "bp:almanac", "bp:warp", "bp:notice" }) do
+		local layout = render(vm, name, { items = {}, recent = {}, species = {}, recipes = {} })
+		local button = find(layout, "close") or find(layout, "ok")
+		vm.closed_with = nil
+		button.on_click()
+		eq(vm.closed_with and vm.closed_with.capture_mouse, true, name)
+	end
 end)

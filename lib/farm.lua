@@ -38,4 +38,12 @@ function M.format_duration(seconds)
 	return string.format("%dh %dm", seconds // 3600, (seconds % 3600) // 60)
 end
 
+-- Text of the label above a shrub with `left` seconds to go (game/shrub_labels.lua).
+function M.label(left)
+	if math.ceil(left) <= 0 then
+		return "Ripe!"
+	end
+	return M.format_duration(left)
+end
+
 return M

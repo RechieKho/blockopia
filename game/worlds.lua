@@ -1,4 +1,4 @@
--- Named worlds: every world name hashes to one 1024 x 1024 cell of the single big map.
+-- Named worlds: every world name hashes to one cell (balance.world_cell_size square) of the single map.
 local wn = require("lib.worldname")
 local store = require("game.store")
 local accounts = require("game.accounts")
@@ -10,15 +10,20 @@ local M = {}
 
 local G, CELL = balance.world_grid, balance.world_cell_size
 
+-- Saved under a key per map layout: cell indices mean nothing on a different grid.
+local LAYOUT = G .. "x" .. CELL
+local REGISTRY = "worlds:registry:" .. LAYOUT
+local SPAWN = "worlds:spawn:" .. LAYOUT .. ":"
+
 local by_name, by_cell, loaded = {}, {}, false
-local pending_warp = {} -- player name -> { x, y, z } for the death-and-respawn fallback
+local arriving = {} -- player name -> { started, last_y, steady } while the loading screen is up
 
 local function ensure()
 	if loaded then
 		return
 	end
 	loaded = true
-	local saved = store.get("worlds:registry") or {}
+	local saved = store.get(REGISTRY) or {}
 	for name, idx in pairs(saved) do
 		idx = math.floor(idx)
 		by_name[name] = idx
@@ -26,7 +31,7 @@ local function ensure()
 	end
 	if not by_name[balance.hub_name] then
 		wn.assign(balance.hub_name, by_name, by_cell, G, balance.hub_name)
-		store.set("worlds:registry", by_name)
+		store.set(REGISTRY, by_name)
 	end
 end
 
@@ -47,7 +52,7 @@ end
 
 -- Where players arrive in a world: the owner's chosen spawn, else above the world centre.
 function M.spawn_of(idx)
-	local custom = store.get("worlds:spawn:" .. idx)
+	local custom = store.get(SPAWN .. idx)
 	if custom then
 		return custom.x, custom.y, custom.z
 	end
@@ -60,35 +65,14 @@ function M.owner_name(idx)
 	return locks.owner_name_at(cx, cz)
 end
 
--- Moves a player. Uses Player:set_pos when the engine has it. Older engines have none, so the
--- fallback kills the player with cause "warp" and the player_death handler respawns them at the
--- target (see M.on_death).
-local function has_set_pos(player)
-	local ok, fn = pcall(function()
-		return player.set_pos
-	end)
-	return ok and fn ~= nil
-end
-
 function M.teleport(player, x, y, z)
-	if has_set_pos(player) then
-		player:set_pos(x, y, z)
-		return
-	end
-	pending_warp[player:get_name()] = { x = x, y = y, z = z }
-	player:damage(1000000, "warp")
+	player:set_pos(x, y, z)
 end
 
 -- player_death handler. Returns a DeathDecision table or nil.
-function M.on_death(player, cause)
-	local name = player:get_name()
-	local target = pending_warp[name]
-	pending_warp[name] = nil
+function M.on_death(player)
 	local health = player:get_health()
 	local full = health and health.max or 20
-	if target then
-		return { heal = full, pos = target, message = "" }
-	end
 	-- Respawn in the world where the player died.
 	local p = player:get_pos()
 	local idx = M.cell_at(p.x, p.z)
@@ -114,7 +98,7 @@ function M.warp(player, raw_name)
 		return false
 	end
 	if is_new then
-		store.set("worlds:registry", by_name)
+		store.set(REGISTRY, by_name)
 	end
 	local acc = accounts.of(player)
 	if acc then
@@ -133,6 +117,8 @@ function M.warp(player, raw_name)
 	local x, y, z = M.spawn_of(idx)
 	M.teleport(player, x, y, z)
 	notify.say(player, "Warping to " .. name .. (is_new and " (a brand new world!)" or "") .. "...")
+	require("game.ui_events").open(player, "bp:loading", { world = name })
+	arriving[player:get_name()] = { started = store.now(), steady = 0 }
 	return true
 end
 
@@ -153,7 +139,7 @@ function M.set_spawn(player)
 		notify.say(player, "Only the owner of the lock covering the world's centre can set its spawn.")
 		return
 	end
-	store.set("worlds:spawn:" .. idx, { x = p.x, y = p.y + 1, z = p.z })
+	store.set(SPAWN .. idx, { x = p.x, y = p.y + 1, z = p.z })
 	notify.say(player, "Spawn point of " .. by_cell[idx] .. " moved here.")
 end
 
@@ -167,6 +153,38 @@ function M.info(player)
 	local name = by_cell[idx] or "(unnamed wilderness)"
 	local owner = M.owner_name(idx)
 	return string.format("World %s%s", name, owner and (" - owned by " .. owner) or " - unclaimed")
+end
+
+-- Closes the loading screen of players who have landed: standing on a block at a steady height
+-- for balance.warp_steady_seconds, or after balance.warp_timeout_seconds whatever happens. Runs every
+-- balance.warp_check_seconds. The screen is only closed if it is still the one showing.
+function M.check_arrivals()
+	local now = store.now()
+	for _, player in accounts.each_online() do
+		local name = player:get_name()
+		local a = arriving[name]
+		if a then
+			local p = player:get_pos()
+			local ground = vb.world.get_block(math.floor(p.x), math.floor(p.y - 0.05), math.floor(p.z)) ~= 0
+			if ground and a.last_y and math.abs(p.y - a.last_y) < 0.01 then
+				a.steady = a.steady + balance.warp_check_seconds
+			else
+				a.steady = 0
+			end
+			a.last_y = p.y
+			if a.steady >= balance.warp_steady_seconds or now - a.started >= balance.warp_timeout_seconds then
+				arriving[name] = nil
+				local ui_events = require("game.ui_events")
+				if ui_events.current_screen(player) == "bp:loading" then
+					ui_events.open(player, "bp:loading", { done = true })
+				end
+			end
+		end
+	end
+end
+
+function M.forget(player)
+	arriving[player:get_name()] = nil
 end
 
 function M.list_recent(acc)

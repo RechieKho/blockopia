@@ -1,7 +1,7 @@
 -- Every tunable number in one place. Pure data: no vb.* calls, so tests can load it.
 return {
 	-- Punching (vb.combat)
-	punch_cooldown_seconds = 0.4,
+	punch_cooldown_seconds = 0.25,
 	heal_after_seconds = 6.0,
 	heal_interval_seconds = 1.0,
 	reach = 6.0,
@@ -26,6 +26,9 @@ return {
 	shrub_sweep_seconds = 5.0,
 	-- Shrubs are only re-staged while a player is within this many blocks.
 	shrub_sweep_radius = 96,
+	-- Shrubs within this many blocks of a player show a "time left" label, updated this often.
+	shrub_label_radius = 24,
+	shrub_label_seconds = 1.0,
 	-- Harvest yield: random(1, max(1, harvest_base - floor(R / harvest_div)))
 	harvest_base = 5,
 	harvest_div = 40,
@@ -34,13 +37,21 @@ return {
 	game_clock_save_seconds = 10.0,
 	inventory_save_seconds = 30.0,
 
-	-- Worlds: a G x G grid of 1024 x 1024 cells centred on the origin.
-	world_cell_size = 1024,
-	world_grid = 256,
+	-- Worlds: a G x G grid of 256 x 256 cells centred on the origin (4096 worlds). The whole map
+	-- stays within +-8192 blocks, where the engine's float rendering is still steady.
+	world_cell_size = 256,
+	world_grid = 64,
 	world_name_max = 24,
+	-- Terrain: rolling hills of world_ground_y +- world_hill_height.
 	world_ground_y = 64,
-	-- Players warp in at this height and fall onto the ground.
-	world_spawn_y = 100,
+	world_hill_height = 8,
+	-- Players warp in at this height (above the highest hill) and fall onto the ground.
+	world_spawn_y = 80,
+	-- The warp loading screen closes once the player has stood on the ground this long, checked
+	-- every warp_check_seconds, or after warp_timeout_seconds at the latest.
+	warp_check_seconds = 0.25,
+	warp_steady_seconds = 0.5,
+	warp_timeout_seconds = 15,
 	hub_name = "START",
 	-- Blocks at or below this height cannot be broken (stands in for a bedrock floor).
 	floor_y = 1,
@@ -59,4 +70,10 @@ return {
 	ledger_keep = 2000,
 
 	lava_damage = 8,
+
+	-- Lock area markers (game/borders.lua): how long they stay and about how many posts per lock.
+	lock_border_seconds = 20,
+	lock_border_posts = 64,
+	-- While a lock is held, its preview ring follows the aimed spot, updated at most this often.
+	lock_preview_seconds = 0.15,
 }

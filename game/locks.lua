@@ -96,6 +96,19 @@ function M.can_place(acc, tier_key, x, y, z)
 	return index:can_place(acc.subject, x, z, box)
 end
 
+-- Other players' locks that a lock of this tier at (x, z) would run into (to show them).
+function M.blockers(acc, tier_key, x, z)
+	ensure()
+	local box = L.box_of(x, z, tiers[tier_key].size)
+	local found = {}
+	for _, lock in ipairs(index:overlapping(box)) do
+		if not L.is_owner_or_admin(lock, acc.subject) then
+			found[#found + 1] = lock
+		end
+	end
+	return found
+end
+
 -- Called after the lock block was placed.
 function M.create(tier_key, player, pos)
 	ensure()
@@ -112,8 +125,9 @@ function M.create(tier_key, player, pos)
 	save(rec)
 	save_index()
 	ledger.log("admin", { to = acc.subject, note = string.format("placed %s #%d at %d,%d,%d", tier.name, seq, pos.x, pos.y, pos.z) })
-	notify.say(player, string.format("%s #%d now protects a %dx%d area around it. Use the wrench on it to manage access.",
+	notify.say(player, string.format("%s #%d now protects a %dx%d area around it (marked for a moment). Use the wrench on it to manage access.",
 		tier.name, seq, rec.size, rec.size))
+	require("game.borders").show(rec)
 	return rec
 end
 
@@ -130,6 +144,7 @@ end
 
 -- The lock block is already gone. Forget the region and hand the item back to its owner.
 function M.remove(lock, player)
+	require("game.borders").hide(lock.id)
 	index:remove(lock.id)
 	store.delete(lock_key(lock.id))
 	save_index()
@@ -189,8 +204,9 @@ function M.open_screen(player, lock)
 	local tier = tiers[lock.tier]
 	local can_edit = lock.owner == acc.subject
 	local is_admin = L.is_owner_or_admin(lock, acc.subject)
+	require("game.borders").show(lock)
 	require("game.ui_events").set_context(player, { screen = "bp:lock", lock_id = lock.id })
-	player:open_ui("bp:lock", {
+	require("game.ui_events").open(player, "bp:lock", {
 		id = lock.id, tier = tier.name, owner = lock.owner_name, size = lock.size,
 		max_size = tier.size, adjustable = tier.adjustable, public = lock.public,
 		admins = names_of(lock, lock.admins), builders = names_of(lock, lock.builders),
@@ -236,6 +252,7 @@ function M.on_ui_event(player, ctx, kind, value)
 				lock.size = size
 				index:add(lock)
 				save(lock)
+				require("game.borders").show(lock)
 			end
 		end
 	elseif kind == "lock_public" then

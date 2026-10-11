@@ -10,6 +10,7 @@ local inventory = require("game.inventory")
 local drops = require("lib.drops")
 local balance = require("data.balance")
 local splices = require("data.splices")
+local labels = require("game.shrub_labels")
 
 local M = {}
 
@@ -132,6 +133,7 @@ function M.on_broken(meta, ctx)
 		return
 	end
 	shrubs:remove(p.x, p.y, p.z)
+	labels.remove(p.x, p.y, p.z)
 	local acc = accounts.of(ctx.player)
 	if actual_stage(rec) < 2 then
 		if acc then
@@ -161,6 +163,7 @@ function M.on_support_broken(x, y, z)
 	local rec = shrubs:get(x, y + 1, z)
 	if rec then
 		shrubs:remove(x, y + 1, z)
+		labels.remove(x, y + 1, z)
 		local id = vb.world.get_block(x, y + 1, z)
 		local meta = ids.meta(id)
 		if meta and meta.kind == "shrub" then
@@ -169,21 +172,21 @@ function M.on_support_broken(x, y, z)
 	end
 end
 
+-- Brings the shrub block up to its stage. False when the block is not a shrub (yet).
 local function refresh(x, y, z, rec)
-	local stage = actual_stage(rec)
-	if stage == rec.stage then
-		return
-	end
-	local sp = ids.species[rec.species]
 	local current = ids.meta(vb.world.get_block(x, y, z))
 	if not (current and current.kind == "shrub") then
 		-- Air here usually means the chunk is not loaded, not that the shrub is gone: keep the
 		-- record and try again on the next sweep. (Every real removal goes through on_broken.)
-		return
+		return false
 	end
-	vb.world.set_block(x, y, z, sp.stages[stage])
-	rec.stage = stage
-	shrubs:touch(x, z)
+	local stage = actual_stage(rec)
+	if stage ~= rec.stage then
+		vb.world.set_block(x, y, z, ids.species[rec.species].stages[stage])
+		rec.stage = stage
+		shrubs:touch(x, z)
+	end
+	return true
 end
 
 -- Re-stages shrubs near online players. Chunks far from everyone are not touched.
@@ -197,6 +200,26 @@ function M.sweep()
 		end)
 	end
 	return seen
+end
+
+-- Puts a "time left" label above every shrub within balance.shrub_label_radius of a player, and
+-- takes down the others. Re-stages those shrubs too, so the block turns ripe with its label.
+function M.update_labels()
+	local want = {}
+	local r = balance.shrub_label_radius
+	for _, player in accounts.each_online() do
+		local p = player:get_pos()
+		shrubs:each_near(p.x, p.z, r, function(x, y, z, rec)
+			if math.abs(x + 0.5 - p.x) > r or math.abs(z + 0.5 - p.z) > r or math.abs(y - p.y) > r then
+				return
+			end
+			if refresh(x, y, z, rec) then
+				local left = farm.time_left(store.now() - rec.planted_at, rec.total)
+				want[labels.key(x, y, z)] = { x = x, y = y, z = z, text = farm.label(left) }
+			end
+		end)
+	end
+	labels.sync(want)
 end
 
 function M.count()

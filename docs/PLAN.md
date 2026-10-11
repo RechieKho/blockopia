@@ -34,7 +34,7 @@ and ticks it, but nothing has been played with a real client or Keycloak.
 - **Fist** does not exist: an empty hand punches. The wrench is a normal inventory item.
 - **Backpack upgrades** are not sold: the engine inventory has a fixed size.
 - **Main Door / starter platform** are not built. `!setspawn` lets the owner of the lock covering a
-  world's centre move its arrival point. Terrain is the same flat meadow everywhere.
+  world's centre move its arrival point. Terrain is rolling hills (meadow and dunes biomes) with lava, gravel and clay pockets.
 - **Bedrock floor:** blocks at or below `floor_y` (1) cannot be broken or built on. A `bp:bedrock`
   block is registered but the generator does not place it.
 - **Dropped items and coins:** drops use the engine's item drops (no custom entity). Coins go
@@ -44,8 +44,8 @@ and ticks it, but nothing has been played with a real client or Keycloak.
   `player:break_block` because the engine's punch ignores non-solid blocks.
 - **Moderation:** bans apply at the next join (the engine has no kick); `!removelock` clears a lock
   without returning the item.
-- **Balance:** `coin_chance` is 0.12 and the punch cooldown 0.4 s, so a small lock takes about six
-  minutes of punching dirt and a grand lock about 37 hours. Terrain is endless, so mining is not
+- **Balance:** `coin_chance` is 0.12 and the punch cooldown 0.25 s, so a small lock takes about
+  three and a half minutes of punching dirt and a grand lock about 23 hours. Terrain is endless, so mining is not
   capped; treat the numbers as a first pass.
 
 ---
@@ -109,7 +109,7 @@ the same stubs into `.vb/lua/`.
 | Wall-clock time           | **None.** Only `tick(dt)`, `vb.after`, `vb.every`                                                | Count game time from `tick` and save it. Shrubs do not grow while the server is off. Optional engine request: `vb.time()`. |
 | Outbound HTTP             | **None**                                                                                         | Not needed: the engine does Keycloak sign-in itself (Phase 2).                           |
 | Sign-in                   | **Built in.** `auth.lua` with `provider = "keycloak"`; `Player:get_login()` gives `{subject, name, claims}` | **Option A chosen.** See Phase 2.                                                       |
-| Teleport                  | `Entity:set_pos` exists, but `Player` has **no `set_pos`**. A death can return a respawn `pos`.  | **Engine gap; blocks warping (Phase 6).** Ask for `Player:set_pos` in the engine.        |
+| Teleport                  | `Player:set_pos(x, y, z)` (engine 0.1.3+). A death can also return a respawn `pos`.              | Resolved: added in engine 0.1.3.                                                         |
 | Kick / ban                | Vetoing `player_join` keeps an account out. The engine itself kicks a second session of the same account. | Bans keyed on `login.subject`.                                                           |
 | Per-block state           | None                                                                                             | State table in `vb.db` keyed by position, plus one block id per growth stage.            |
 | Entities                  | `vb.register_entity`, `vb.world.spawn`                                                           | Only for extras; drops use the engine's item drops.                                      |
@@ -147,8 +147,8 @@ off, and the largest safe coordinate (for the world-name grid in Phase 6).
    - `Account { subject, display_name, coins, stats, groups }`, keyed by the Keycloak `subject`
      from `player:get_login()`, never by the player name.
    - `accounts.of(player)` is the only way gameplay code finds an account.
-   - Development: `--insecure-skip-auth` makes `get_login()` return `nil`; the accounts module
-     then uses `dev:<player name>` as the key. That flag does not exist in release builds.
+   - Development: without `auth.lua` (`.dev/tools/play_local.sh`) `get_login()` returns `nil`;
+     the accounts module then uses `dev:<player name>` as the key.
 4. **Inventory and HUD** (`ui/hud.lua`)
    - Items use the engine inventory (`give`, `take`, `get_inventory`, `max_stack = 200`).
    - Coins are an account balance, not an inventory item, so they never fill a slot. The HUD
@@ -298,21 +298,19 @@ uses the saved game time).
 
 ## Phase 6: Named worlds as coordinates
 
-The game runs on one continuous world, split into a grid of **1024 × 1024 cells**. Each cell is
+The game runs on one continuous world, split into a grid of **256 × 256 cells**. Each cell is
 one "world".
 
 - **Name rules:** names are turned into uppercase `A-Z0-9`, 1-24 characters, with a blocklist.
 - **Name → cell** (`lib/worldname.lua`): the FNV-1a 32-bit hash of the name picks a cell in a
   `G × G` grid centred on the origin, with G limited by the engine's safe coordinate range from
-  Phase 0 (for example G = 256, so ±131k blocks). The world centre is
-  `(gx * 1024 + 512, gz * 1024 + 512)`.
+  Phase 0: G = 64, so ±8192 blocks (at ±131k, the first design, blocks visibly jittered). The
+  world centre is `(gx * 256 + 128, gz * 256 + 128)`.
 - **Collisions:** the first name to reach a cell claims it in a saved `worlds/` registry.
   Another name with the same hash takes the next free cell along a fixed probe sequence, so a
   name always gives the same coordinate once registered. Cell (0,0) is reserved for the hub,
   `START`.
-- **Warping needs an engine change:** the engine cannot move a player yet (`Player` has no
-  `set_pos`). Add `Player:set_pos` to the engine before this phase. A workaround through death and
-  a respawn position exists, but it shows a death and is not worth building.
+- **Warping uses `Player:set_pos`,** added in engine 0.1.3.
 - **Warping:** the `!warp NAME` command and the `ui/warp.lua` screen (recent worlds, owner, lock
   status). Arrival point: the owner's **Main Door** if they set one, otherwise the highest solid
   block at the centre (found with `vb.world.raycast`), plus brief spawn protection.
@@ -329,14 +327,14 @@ meet; name collisions are handled deterministically (test in `tests/worldname_te
 ## Phase 7: Ownership with locks
 
 There is no "world lock". Instead there are lock tiers. Every lock's area is centred on the lock
-block itself. The largest one, the **Grand Lock**, always covers a fixed 1024 × 1024 area.
+block itself. The largest one, the **Grand Lock**, always covers a fixed 256 × 256 area (one world).
 
 | Lock        | Area (X × Z, all heights)                                                       | Adjustable              | Coin price |
 | ----------- | ------------------------------------------------------------------------------- | ----------------------- | ---------- |
 | Small Lock  | up to 10 × 10, centred on the lock                                              | yes (smaller square)    | 50         |
 | Big Lock    | up to 48 × 48, centred on the lock                                              | yes                     | 200        |
 | Huge Lock   | up to 200 × 200, centred on the lock                                            | yes                     | 500        |
-| Grand Lock  | **exactly 1024 × 1024, centred on the lock**                                    | **no**                  | ~20,000    |
+| Grand Lock  | **exactly 256 × 256 (one world), centred on the lock**                          | **no**                  | ~20,000    |
 
 All values live in `data/locks.lua` and are tunable.
 
@@ -346,7 +344,7 @@ All values live in `data/locks.lua` and are tunable.
   borders: a Grand Lock usually spans parts of up to four named-world cells.
 - **Placement rules:**
   - A new region may not overlap any region owned by someone else.
-  - A Grand Lock needs its full 1024 × 1024 area to be free of foreign locks. Before placing,
+  - A Grand Lock needs its full 256 × 256 area to be free of foreign locks. Before placing,
     the client shows the outline and any lock that would block it.
   - Inside your own Grand Lock you may place smaller locks to give out sub-areas. The innermost
     lock decides access, but the Grand Lock owner keeps admin rights.
@@ -423,8 +421,8 @@ player. Trades cannot duplicate items, even when a player disconnects mid-trade 
 P0 (done) ─► P1 foundations ──► P3 punch/drops ──► P4 farming ──► P5 splicing
                  │                    │
                  ├──► P2 Keycloak     └──► P6 worlds ──► P7 locks ──► P8 economy ──► P9
-                 │    (in parallel; development uses --insecure-skip-auth)
-                 └──► engine: Player:set_pos (needed before P6)
+                 │    (in parallel; development runs without auth.lua)
+                 └──► engine: Player:set_pos (done in 0.1.3)
 ```
 
 P2 is small now that the engine signs players in, and can run alongside P3-P6. It must be

@@ -87,7 +87,7 @@ function M.open(player, pos)
 		and ctx.pos.z == pos.z) and ctx or { screen = "bp:vending", pos = { x = pos.x, y = pos.y, z = pos.z }, qty = 1 }
 	draft.qty = util.clamp(draft.qty or 1, 1, 200)
 	ctx_store.set_context(player, draft)
-	player:open_ui("bp:vending", {
+	require("game.ui_events").open(player, "bp:vending", {
 		owner = m.owner_name, is_owner = is_owner, item = item_label(m.item), item_id = m.item,
 		stock = m.stock, bundle = m.bundle, price = m.price, till = m.till, qty = draft.qty,
 		coins = acc.coins, held = held and ids.label(held.item) or "nothing",

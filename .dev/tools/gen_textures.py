@@ -70,20 +70,25 @@ def seed(key, color):
 
 
 def shrub(key, color, stage):
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    green = (60, 150, 60, 255)
-    height = (4, 9, 14)[stage]
-    for y in range(SIZE - height, SIZE):
-        img.putpixel((8, y), green)
-    for i in range(1, stage + 2):
-        y = SIZE - 2 - i * 3
-        if y >= 0:
-            for dx in (-2, -1, 1, 2):
-                img.putpixel((8 + dx, y), green)
-    if stage == 2:  # ripe: fruit in the species colour
-        for (x, y) in ((6, 2), (10, 3), (7, 5), (9, 6), (8, 1)):
-            img.putpixel((x, y), color + (255,))
-            img.putpixel((x + 1, y), color + (255,))
+    # A leafy bush filling the block: leaves get denser as it grows, and a ripe one shows fruit in
+    # the species colour. Fully opaque: engines before 0.1.5 had no alpha cutout, so clear texels
+    # showed holes of sky through the terrain behind.
+    rng = random.Random("%s_s%d" % (key, stage))
+    shadow = (28, 74, 32)
+    leaf = ((92, 178, 84), (70, 156, 64), (58, 138, 56))[stage]
+    density = (0.35, 0.6, 0.8)[stage]
+    img = Image.new("RGBA", (SIZE, SIZE), shadow + (255,))
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if rng.random() < density:
+                img.putpixel((x, y), shade(leaf, rng.randint(-18, 18)) + (255,))
+    border(img, shade(shadow, -12))
+    if stage == 2:
+        dark = shade(color, -70)
+        for (x, y) in ((3, 3), (10, 2), (6, 7), (12, 8), (3, 11), (9, 12)):
+            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                img.putpixel((x + dx, y + dy), color + (255,))
+            img.putpixel((x + 1, y + 1), dark + (255,))
     save("%s_s%d" % (key, stage), img)
 
 
@@ -99,6 +104,28 @@ def lock(tier, color):
             img.putpixel((x, y), (40, 40, 40, 255))
     img.putpixel((8, 10), color + (255,))
     save("lock_" + tier, img)
+
+
+def border_post(tier, color):
+    # bp:border sprite sheet (entities/border.lua): variant "tall" = 128 x 256 frames, 4 facings
+    # mirrored = 3 rows, one frame. A pole in the lock tier's colour with a pennant, the same from
+    # every side; transparent around it.
+    fw, fh, rows = 128, 256, 3
+    img = Image.new("RGBA", (fw, fh * rows), (0, 0, 0, 0))
+    dark = shade(color, -70)
+    for r in range(rows):
+        top = r * fh
+        for y in range(top + 20, top + fh):
+            for x in range(44, 84):
+                edge = x in (44, 45, 46, 81, 82, 83)
+                band = ((y - top) // 24) % 2 == 0
+                c = dark if edge else (color if band else shade(color, 45))
+                img.putpixel((x, y), c + (255,))
+        for y in range(top + 20, top + 76):  # pennant
+            width = int(44 * (1 - abs((y - top) - 48) / 28.0))
+            for x in range(84, 84 + max(0, min(width, 44))):
+                img.putpixel((x, y), shade(color, 25) + (255,))
+    img.save(os.path.join(OUT, "border_%s.png" % tier))
 
 
 def vending(key, color):
@@ -154,6 +181,8 @@ def main():
             vending(key, color)
     for tier, color in lock_colors.items():
         lock(tier, color)
+        border_post(tier, color)
+    border_post("blocked", (225, 60, 50))  # the preview where a lock cannot go
 
 
 if __name__ == "__main__":
