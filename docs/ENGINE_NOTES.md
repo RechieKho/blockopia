@@ -70,6 +70,8 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
 | Rendering uses float coordinates far from the origin | blocks jittered near ±131 000 (the first map) | the map is 64 x 64 worlds of 256 blocks, so everything stays within ±8192 | camera-relative rendering |
 | Custom keybinds (E, Esc) are sent while the chat box or a text field is open | typing "e" opens the menu | every screen opens through `ui_events.open`, so the server ignores E while one of our screens is open (until its `close` event); `ui/hud.lua` reports `client.chat_open()` changes as a `hud_chat` event, so E is also ignored while the chat box is open (still needed on 0.1.5) | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
+| No text in the world | shrub timers cannot be drawn as text | each timer text is a pre-drawn texture (`textures/timer/`, `.dev/tools/gen_textures.py`) shown by a `bp:shrub_timer` billboard, respawned when the text changes | world-space text, or a way to change an entity's texture after spawn |
+| Other entities never carry the on-ground flag, so the client plays their `jump` clip (unknown names fall back to the first clip) | a sprite sheet cannot pick a frame by clip name | one texture per timer label instead of one sheet | send `on_ground` for script entities, or an `entity:set_clip(name)` |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
 
 ## Notes on engine behaviour the pack depends on

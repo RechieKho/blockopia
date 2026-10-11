@@ -128,6 +128,76 @@ def border_post(tier, color):
     img.save(os.path.join(OUT, "border_%s.png" % tier))
 
 
+# 5 x 7 pixel font for the shrub timer labels: just the characters they use.
+GLYPHS = {
+    "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+    "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+    "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+    "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+    "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+    "5": ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+    "6": ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+    "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+    "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+    "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+    "s": ["00000", "00000", "01111", "10000", "01110", "00001", "11110"],
+    "m": ["00000", "00000", "11010", "10101", "10101", "10101", "10101"],
+    "h": ["10000", "10000", "10110", "11001", "10001", "10001", "10001"],
+    "R": ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+    "i": ["00100", "00000", "01100", "00100", "00100", "00100", "01110"],
+    "p": ["00000", "00000", "11110", "10001", "11110", "10000", "10000"],
+    "e": ["00000", "00000", "01110", "10001", "11111", "10000", "01110"],
+    "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
+}
+LABEL_MAX_HOURS = 99
+
+
+def label_texts():
+    # Must match lib/farm.lua's label_texts().
+    return (["Ripe!"] + ["%ds" % n for n in range(1, 60)] + ["%dm" % n for n in range(1, 60)]
+            + ["%dh" % n for n in range(1, LABEL_MAX_HOURS + 1)])
+
+
+def draw_label(img, left, top, fw, fh, text):
+    # A dark rounded tag with the text in white (green for "Ripe!"), centred low in the frame.
+    gap, pad = 2, 14
+    scale = min(9, (fw - 2 * pad - 4) // (len(text) * (5 + gap) - gap))  # "Ripe!" is drawn smaller
+    ink = (120, 235, 110, 255) if text == "Ripe!" else (255, 255, 255, 255)
+    text_w = len(text) * (5 + gap) * scale - gap * scale
+    w, h = text_w + 2 * pad, 7 * scale + 2 * pad
+    x0, y0 = left + (fw - w) // 2, top + fh - h - 2
+    for y in range(h):
+        for x in range(w):
+            corner = min(x, w - 1 - x) < 6 and min(y, h - 1 - y) < 6 and \
+                (min(x, w - 1 - x) - 6) ** 2 + (min(y, h - 1 - y) - 6) ** 2 > 36
+            if not corner:
+                edge = min(x, w - 1 - x, y, h - 1 - y) < 3
+                img.putpixel((x0 + x, y0 + y), (15, 15, 15, 255) if edge else (45, 45, 45, 255))
+    cx = x0 + pad
+    for ch in text:
+        for gy, row in enumerate(GLYPHS[ch]):
+            for gx, bit in enumerate(row):
+                if bit == "1":
+                    for yy in range(scale):
+                        for xx in range(scale):
+                            img.putpixel((cx + gx * scale + xx, y0 + pad + gy * scale + yy), ink)
+        cx += (5 + gap) * scale
+
+
+def shrub_timers():
+    # bp:shrub_timer labels (entities/shrub_timer.lua), one texture per text: variant "flat" =
+    # 256 x 128 frame, 4 facings mirrored = 3 identical rows.
+    fw, fh, rows = 256, 128, 3
+    out = os.path.join(OUT, "timer")
+    os.makedirs(out, exist_ok=True)
+    for text in label_texts():
+        img = Image.new("RGBA", (fw, fh * rows), (0, 0, 0, 0))
+        for r in range(rows):
+            draw_label(img, 0, r * fh, fw, fh, text)
+        name = "ripe" if text == "Ripe!" else text
+        img.save(os.path.join(out, name + ".png"), optimize=True)
+
+
 def vending(key, color):
     img = noisy(color, key, 6)
     border(img, shade(color, -50))
@@ -183,6 +253,7 @@ def main():
         lock(tier, color)
         border_post(tier, color)
     border_post("blocked", (225, 60, 50))  # the preview where a lock cannot go
+    shrub_timers()
 
 
 if __name__ == "__main__":

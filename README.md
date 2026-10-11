@@ -6,7 +6,8 @@ as a content pack in Lua.
 - **Punch blocks** (discrete punches, no hold-to-break) to get the block, sometimes its **seed**,
   and **coins**. Each block sets its own seed chance; rarer blocks pay more coins.
 - **Plant seeds** to grow shrubs that drop their block when ripe. The rarer the species, the longer
-  it takes: `grow_scale * (R^3 + 30 R)` seconds.
+  it takes: `grow_scale * (R^3 + 30 R)` seconds. A label floating above each shrub near you
+  counts down the time left (`27s`, `11h`, ...) and says **Ripe!** when it is ready.
 - **Splice** a second seed onto a growing shrub to make a rarer species (`data/splices.lua`).
 - **Worlds are names.** `!warp NAME` hashes the name to one 256 x 256 cell of a 64 x 64 grid
   (4096 worlds, all within ±8192 blocks of the origin), so the same name always leads to the same

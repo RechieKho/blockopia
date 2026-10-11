@@ -26,6 +26,9 @@ return {
 	shrub_sweep_seconds = 5.0,
 	-- Shrubs are only re-staged while a player is within this many blocks.
 	shrub_sweep_radius = 96,
+	-- Shrubs within this many blocks of a player show a "time left" label, updated this often.
+	shrub_label_radius = 24,
+	shrub_label_seconds = 1.0,
 	-- Harvest yield: random(1, max(1, harvest_base - floor(R / harvest_div)))
 	harvest_base = 5,
 	harvest_div = 40,

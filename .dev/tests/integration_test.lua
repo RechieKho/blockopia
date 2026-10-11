@@ -292,6 +292,54 @@ test("breaking the soil destroys the shrub on it", function()
 	eq(require("game.farm").get(8, 64, 8), nil)
 end)
 
+test("shrubs near a player show how long they have left, then Ripe!", function()
+	fresh()
+	local a = dev("alice")
+	local labels = require("game.shrub_labels")
+	local farm_lib = require("lib.farm")
+	M.select(a, "bp:dirt_seed")
+	aim(5, 63, 5, 0, 1, 0)
+	M.click(a, "secondary")
+	local total = require("game.farm").get(5, 64, 5).total
+	M.advance(1)
+	eq(#M.entities, 1)
+	local e = M.entities[1]
+	eq(e.kind, "bp:shrub_timer")
+	truthy(e.x == 5.5 and e.z == 5.5 and math.abs(e.y - 65.05) < 1e-9, "just above the shrub")
+	local text = labels.text_at(5, 64, 5)
+	local whole = math.floor(total)
+	truthy(text == (whole - 1) .. "s" or text == whole .. "s", tostring(text))
+	eq(e.opts.visual_override.texture, farm_lib.label_texture(text))
+	M.advance(5)
+	local later = labels.text_at(5, 64, 5)
+	truthy(later ~= text, "the label counts down")
+	eq(#M.entities, 1, "the old label was replaced")
+	M.advance(total)
+	eq(labels.text_at(5, 64, 5), "Ripe!")
+	eq(M.entities[1].opts.visual_override.texture, "textures/timer/ripe.png")
+	eq(M.world["5,64,5"], M.id("bp:dirt_s2"), "the block is ripe with its label")
+	-- walking away takes it down; coming back puts it up again
+	a.x, a.z = 200.5, 200.5
+	M.advance(1)
+	eq(#M.entities, 0)
+	a.x, a.z = 0.5, 0.5
+	M.advance(1)
+	eq(#M.entities, 1)
+	-- harvesting removes it at once
+	aim(5, 64, 5)
+	M.click(a, "primary")
+	eq(M.world["5,64,5"], nil)
+	eq(#M.entities, 0)
+	-- every sheet a label can need is in the pack
+	local files = {}
+	for _, name in ipairs(M.listdir("textures/timer")) do
+		files["textures/timer/" .. name] = true
+	end
+	for _, t in ipairs(farm_lib.label_texts()) do
+		truthy(files[farm_lib.label_texture(t)], t)
+	end
+end)
+
 test("a small lock protects its square and nothing else", function()
 	fresh()
 	local a, b = dev("alice"), dev("bob")
