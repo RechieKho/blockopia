@@ -6,6 +6,8 @@
 -- kind = "species"  a natural block: expands to the block, its seed, and three shrub stages
 -- kind = "lock"     a lock tier from data/locks.lua
 -- kind = "vending"  the vending machine
+-- kind = "clothing" something to wear (game/wardrobe.lua): its `slot`, the paper-doll `sheet`
+--                   (textures/player/<sheet>.png) and the dye `tint` multiplied into that sheet
 return {
 	{ kind = "special", key = "bedrock", name = "Bedrock", color = { 40, 40, 46 },
 		def = { max_damage = 65535 }, unbreakable = true },
@@ -35,4 +37,15 @@ return {
 	{ kind = "lock", tier = "huge" },
 	{ kind = "lock", tier = "grand" },
 	{ kind = "vending", key = "vending", name = "Vending Machine", color = { 200, 60, 70 } },
+
+	{ kind = "clothing", key = "red_cap", name = "Red Cap", slot = "hat", sheet = "cap", tint = { 210, 50, 50 } },
+	{ kind = "clothing", key = "blue_cap", name = "Blue Cap", slot = "hat", sheet = "cap", tint = { 60, 100, 210 } },
+	{ kind = "clothing", key = "straw_hat", name = "Straw Hat", slot = "hat", sheet = "straw_hat" },
+	{ kind = "clothing", key = "red_shirt", name = "Red Shirt", slot = "shirt", sheet = "shirt", tint = { 200, 60, 60 } },
+	{ kind = "clothing", key = "green_shirt", name = "Green Shirt", slot = "shirt", sheet = "shirt", tint = { 70, 160, 80 } },
+	{ kind = "clothing", key = "yellow_shirt", name = "Yellow Shirt", slot = "shirt", sheet = "shirt", tint = { 235, 200, 60 } },
+	{ kind = "clothing", key = "jeans", name = "Jeans", slot = "pants", sheet = "trousers", tint = { 70, 100, 170 } },
+	{ kind = "clothing", key = "brown_trousers", name = "Brown Trousers", slot = "pants", sheet = "trousers", tint = { 130, 90, 60 } },
+	{ kind = "clothing", key = "purple_cape", name = "Purple Cape", slot = "back", sheet = "cape", tint = { 130, 60, 175 } },
+	{ kind = "clothing", key = "red_cape", name = "Red Cape", slot = "back", sheet = "cape", tint = { 190, 40, 45 } },
 }

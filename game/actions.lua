@@ -54,6 +54,10 @@ local function secondary(player, acc, input)
 	if not meta then
 		return
 	end
+	if meta.kind == "clothing" then
+		require("game.wardrobe").toggle(player, acc, meta)
+		return
+	end
 	local hit = M.pick(player, input)
 	if not hit then
 		return

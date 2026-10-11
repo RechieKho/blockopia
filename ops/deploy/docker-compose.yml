@@ -16,8 +16,8 @@ services:
       context: ../..
       dockerfile: ops/deploy/Dockerfile
       args:
-        VB_VERSION: ${VB_VERSION:-v0.1.5}
-    image: blockopia-server:${VB_VERSION:-v0.1.5}
+        VB_VERSION: ${VB_VERSION:-v0.1.7}
+    image: blockopia-server:${VB_VERSION:-v0.1.7}
     restart: unless-stopped
     depends_on:
       - caddy

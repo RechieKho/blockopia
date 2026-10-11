@@ -4,6 +4,9 @@ local M = {}
 
 M.PREFIX = "bp:"
 
+-- Where clothing can be worn (data/items.lua kind = "clothing").
+M.SLOTS = { hat = true, shirt = true, pants = true, back = true }
+
 local function texture_for(name)
 	return "textures/" .. name:gsub("^" .. M.PREFIX, "") .. ".png"
 end
@@ -69,6 +72,11 @@ function M.expand(items, locks)
 			add(M.name(e.key), { max_damage = 4, solid = true, opaque = true }, {
 				kind = "vending", key = e.key, label = e.name, color = e.color,
 			})
+		elseif e.kind == "clothing" then
+			add(M.name(e.key), { solid = false, opaque = false }, {
+				kind = "clothing", key = e.key, label = e.name, slot = e.slot, sheet = e.sheet,
+				tint = e.tint, color = e.tint or { 220, 190, 110 },
+			})
 		end
 	end
 	return out
@@ -103,6 +111,22 @@ function M.validate(items, locks, file_exists)
 		elseif e.kind == "lock" then
 			if not locks[e.tier] then
 				err("lock entry names unknown tier '%s'", tostring(e.tier))
+			end
+		elseif e.kind == "clothing" then
+			if not M.SLOTS[e.slot] then
+				err("'%s': slot must be one of hat, shirt, pants, back", tostring(key))
+			end
+			if type(e.sheet) ~= "string" or not e.sheet:match("^[%w_]+$") then
+				err("'%s': sheet must be a file name in textures/player/", tostring(key))
+			end
+			if e.tint ~= nil then
+				local ok = type(e.tint) == "table" and #e.tint == 3
+				for _, v in ipairs(type(e.tint) == "table" and e.tint or {}) do
+					ok = ok and math.type(v) == "integer" and v >= 0 and v <= 255
+				end
+				if not ok then
+					err("'%s': tint must be { r, g, b } with integers 0..255", tostring(key))
+				end
 			end
 		elseif e.kind ~= "special" and e.kind ~= "vending" then
 			err("entry '%s' has unknown kind '%s'", tostring(key), tostring(e.kind))

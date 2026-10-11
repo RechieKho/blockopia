@@ -7,8 +7,11 @@ as a content pack in Lua.
   and **coins**. Each block sets its own seed chance; rarer blocks pay more coins.
 - **Plant seeds** to grow shrubs that drop their block when ripe. The rarer the species, the longer
   it takes: `grow_scale * (R^3 + 30 R)` seconds. A label floating above each shrub near you
-  counts down the time left (`27s`, `11h`, ...) and says **Ripe!** when it is ready.
+  counts down the time left (`27s`, `1m 30s`, `11h 12m`) and says **Ripe!** when it is ready.
 - **Splice** a second seed onto a growing shrub to make a rarer species (`data/splices.lua`).
+- **Dress up.** Caps, hats, shirts, trousers and capes from the coin store are drawn on your
+  sprite for everyone to see (right click one in your hand to wear it; it stays in your inventory,
+  and comes off if it leaves it). Your outfit is saved with your account.
 - **Worlds are names.** `!warp NAME` hashes the name to one 256 x 256 cell of a 64 x 64 grid
   (4096 worlds, all within ±8192 blocks of the origin), so the same name always leads to the same
   place. Terrain is rolling hills of grass or sand over dirt and rock.
@@ -28,10 +31,11 @@ vb pack dev                             # host with restart-on-save and open the
 .dev/tools/play_local.sh
 ```
 
-Needs Voxel Browser **0.1.5** or newer (`pack.toml` enforces it): earlier releases lack asset sync
-in release builds (0.1.2), break cold joins once the pack writes `vb.db` (0.1.3), and lose the
+Needs Voxel Browser **0.1.7** or newer (`pack.toml` enforces it): earlier releases lack asset sync
+in release builds (0.1.2), break cold joins once the pack writes `vb.db` (0.1.3), lose the
 player's name on leave, crash when a screen closes itself and draw see-through textures with holes
-(0.1.4). See `docs/ENGINE_NOTES.md`.
+(0.1.4), and have no world-space text, player appearances or third-person camera (0.1.5). See
+`docs/ENGINE_NOTES.md`.
 
 Since 0.1.5, `vb pack dev` and `vb host --pack .` keep a world per pack
 (`<vb data>/servers/default/worlds/blockopia-<hash>/`), and a server refuses a world saved by
@@ -42,7 +46,8 @@ see another pack's untextured terrain or old flat ground around spawn, delete th
 copy (run it again after editing). Accounts are then keyed `dev:<player name>`.
 
 In game: **E** opens the menu, **left click** punches, **right click** places a block / plants a seed
-/ splices a seed onto a growing shrub / uses the wrench. **Chat commands** (`!help`):
+/ splices a seed onto a growing shrub / uses the wrench / puts on or takes off the clothing in your
+hand. **F5** switches to third person, so you can see your outfit. **Chat commands** (`!help`):
 
 | Command | What it does |
 | --- | --- |

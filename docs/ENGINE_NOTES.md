@@ -1,22 +1,26 @@
 # Engine notes
 
 What Blockopia needs from the Voxel Browser engine, what was verified, and where the pack works
-around a gap. Required engine: **0.1.5** (`pack.toml`). Last checked against `1c77229` (`v0.1.5`),
+around a gap. Required engine: **0.1.7** (`pack.toml`). Last checked against `48ec806` (`v0.1.7`),
 built locally with networking, asset sync and the engine's e2e automation harness.
 
 ## Verified against the real engine
 
-- `vb pack check --json --strict` is clean: the whole pack loads (86 blocks), the Lua sandbox lint
+- `vb pack check --json --strict` is clean on 0.1.7: the whole pack loads (96 blocks), the Lua sandbox lint
   passes, and no `vb.*` call appears in `ui/` or the reverse.
 - The real server starts with the pack, runs 400 ticks without script
   errors, and persists `vb.storage.block_order`.
-- End to end on 0.1.5 (`.dev/tools/e2e_join.py`: a real server and real headless clients over UDP):
+- End to end on 0.1.7 (`.dev/tools/e2e_join.py`: a real server and real headless clients over UDP):
   a cold-cache client joins after the pack has written `vb.db`, receives `ui/` and textures and no
   `db/` files; the HUD shows coins; `!world` answers in chat; `!menu`, `!store` and `!almanac` open;
   breaking grass and dirt drops the block and its seed, which are picked up by walking onto them;
   `!warp` teleports with `set_pos` to a new world in another cell, whose chunks load and whose
   ground is generated terrain; a second cold-cache client joins later. A windowed client under Xvfb
   draws the textured ground, HUD, hotbar and chat after the warp.
+- On 0.1.7 with two windowed clients: Bob sees Alice's `bp:player` sprite with the outfit she put on
+  (cap, shirt, jeans, cape) from the front, both sides and the back (the cape behind the body on
+  front and side views, over it on the back view), and walking; a shrub's text label counts down
+  in place. No warnings in the server or client logs (no skipped layer sheets, no clip fallbacks).
 - API shapes the pack calls were read from the engine source: `player:punch/break_block/place_block`,
   `give/take/get_inventory/get_held_item`, `player_death` decisions (`heal`, `pos`, `message`),
   `ui_event(player, ui_name, widget_id, kind, value)` with `kind` = the string passed to
@@ -32,7 +36,7 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 3. HUD layout at larger window sizes (only checked at 720 x 360).
 4. The hidden-chat-line HUD channel (below) under heavy chat.
 
-## Fixed in engine 0.1.3 to 0.1.5
+## Fixed in engine 0.1.3 to 0.1.7
 
 - **Asset sync in release builds.** 0.1.2 release builds were compiled without
   `VB_WITH_COMPRESSION`, so the server skipped asset sync without a word and joining clients got
@@ -55,6 +59,12 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
   (the loading screen closes itself again, the HUD command line is gone); `player_leave` handles
   that keep the player's name (the pack's "find who left" fallback is gone). Shrubs keep their
   opaque bush textures: they read well and avoid depending on the cutout.
+- **0.1.7: text, clips, layering and appearances.** World-space text labels that a pack can change
+  in place (shrub timers are text now; the 218 pre-drawn label textures are gone); real on-ground
+  flags so other entities play `idle`/`walk` instead of always `jump`, plus `entity:set_clip`;
+  cutout and back-to-front sorting for sprites, `visual.layer`, `through_walls` and
+  `entity:attach_to`; paper-doll `layers` with `player:set_visual_override` and the F5
+  third-person camera (clothing uses them).
 
 ## Gaps and workarounds
 
@@ -70,8 +80,6 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
 | `vb pack check` lints every `.lua` under the pack | tests/tools using `io`/`os` raise errors | tests and tools live in `.dev/`; dot-directories are skipped | an ignore list in `pack.toml` |
 | Rendering uses float coordinates far from the origin | blocks jittered near ±131 000 (the first map) | the map is 64 x 64 worlds of 256 blocks, so everything stays within ±8192 | camera-relative rendering |
 | Custom keybinds (E, Esc) are sent while the chat box or a text field is open | typing "e" opens the menu | every screen opens through `ui_events.open`, so the server ignores E while one of our screens is open (until its `close` event); `ui/hud.lua` reports `client.chat_open()` changes as a `hud_chat` event, so E is also ignored while the chat box is open (still needed on 0.1.5) | gate `kCustomKeybinds` in `sample_input_cmd` on the chat box / focused text field |
-| No text in the world | shrub timers cannot be drawn as text | each timer text is a pre-drawn texture (`textures/timer/`, `.dev/tools/gen_textures.py`) shown by a `bp:shrub_timer` billboard, respawned when the text changes | world-space text, or a way to change an entity's texture after spawn |
-| Other entities never carry the on-ground flag, so the client plays their `jump` clip (unknown names fall back to the first clip) | a sprite sheet cannot pick a frame by clip name | one texture per timer label instead of one sheet | send `on_ground` for script entities, or an `entity:set_clip(name)` |
 | Block placement needs a solid neighbour | cannot place in mid-air | by design (Growtopia-like building) | - |
 
 ## Notes on engine behaviour the pack depends on
@@ -89,3 +97,13 @@ The e2e run uses a copy of the pack without `auth.lua`. Still untested in a real
   into integers on read.
 - `ui.send_event` payloads and everything else from a client are untrusted: every handler re-checks
   ownership, balances and value types, and events are rate limited per player.
+
+## Notes on 0.1.7 features
+
+- A player's appearance lasts for their session only: `game/wardrobe.lua` sends it again when the
+  player becomes ready, and checks every 3 s that worn items are still in the inventory.
+- Name tags (a text entity attached to the player) are not used: an entity attached to your own
+  player is drawn in first person too, so your own tag would float just above your eyes. A way to
+  hide attachments of the local player in first person would make them usable.
+- The e2e automation has no F5 key, so a player seeing their own outfit in third person was not
+  checked automatically.

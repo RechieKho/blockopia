@@ -1,6 +1,6 @@
 # Blockopia game server: the Voxel Browser dedicated server built from source at a pinned engine
 # tag, plus this pack. Built by docker-compose.yml (context = the repository root).
-ARG VB_VERSION=v0.1.5
+ARG VB_VERSION=v0.1.7
 
 FROM ubuntu:24.04 AS engine
 ARG VB_VERSION

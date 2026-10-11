@@ -296,48 +296,104 @@ test("shrubs near a player show how long they have left, then Ripe!", function()
 	fresh()
 	local a = dev("alice")
 	local labels = require("game.shrub_labels")
-	local farm_lib = require("lib.farm")
 	M.select(a, "bp:dirt_seed")
 	aim(5, 63, 5, 0, 1, 0)
 	M.click(a, "secondary")
 	local total = require("game.farm").get(5, 64, 5).total
 	M.advance(1)
-	eq(#M.entities, 1)
-	local e = M.entities[1]
-	eq(e.kind, "bp:shrub_timer")
+	local timers = {}
+	for _, e in ipairs(M.entities) do
+		if e.kind == "bp:shrub_timer" then
+			timers[#timers + 1] = e
+		end
+	end
+	eq(#timers, 1)
+	local e = timers[1]
 	truthy(e.x == 5.5 and e.z == 5.5 and math.abs(e.y - 65.05) < 1e-9, "just above the shrub")
-	local text = labels.text_at(5, 64, 5)
 	local whole = math.floor(total)
-	truthy(text == (whole - 1) .. "s" or text == whole .. "s", tostring(text))
-	eq(e.opts.visual_override.texture, farm_lib.label_texture(text))
+	truthy(e.text == (whole - 1) .. "s" or e.text == whole .. "s", tostring(e.text))
+	eq(labels.text_at(5, 64, 5), e.text)
 	M.advance(5)
-	local later = labels.text_at(5, 64, 5)
-	truthy(later ~= text, "the label counts down")
-	eq(#M.entities, 1, "the old label was replaced")
+	truthy(e.text ~= labels.text and e.text_sets >= 1, "the same label counts down in place")
+	truthy(e.text_sets >= 4, "updated every second")
 	M.advance(total)
-	eq(labels.text_at(5, 64, 5), "Ripe!")
-	eq(M.entities[1].opts.visual_override.texture, "textures/timer/ripe.png")
+	eq(e.text, "Ripe!")
+	eq(e.text_style.color[2], 235, "green when ripe")
 	eq(M.world["5,64,5"], M.id("bp:dirt_s2"), "the block is ripe with its label")
+	local count = #M.entities
 	-- walking away takes it down; coming back puts it up again
 	a.x, a.z = 200.5, 200.5
 	M.advance(1)
-	eq(#M.entities, 0)
+	eq(#M.entities, count - 1)
 	a.x, a.z = 0.5, 0.5
 	M.advance(1)
-	eq(#M.entities, 1)
+	eq(#M.entities, count)
 	-- harvesting removes it at once
 	aim(5, 64, 5)
 	M.click(a, "primary")
 	eq(M.world["5,64,5"], nil)
-	eq(#M.entities, 0)
-	-- every sheet a label can need is in the pack
-	local files = {}
-	for _, name in ipairs(M.listdir("textures/timer")) do
-		files["textures/timer/" .. name] = true
+	eq(#M.entities, count - 1)
+	eq(labels.text_at(5, 64, 5), nil)
+end)
+
+test("clothing: right click puts it on and takes it off; the sprite gets paper-doll layers", function()
+	fresh()
+	local a = dev("alice")
+	a:give({ item = M.id("bp:red_cap"), count = 1 })
+	a:give({ item = M.id("bp:purple_cape"), count = 1 })
+	a:give({ item = M.id("bp:jeans"), count = 1 })
+	M.select(a, "bp:red_cap")
+	M.click(a, "secondary")
+	eq(account(a).outfit.hat, "red_cap")
+	local layers = a.visual_override.layers
+	eq(#layers, 1)
+	eq(layers[1].texture, "textures/player/cap.png")
+	eq(layers[1].tint[1], 210)
+	M.select(a, "bp:purple_cape")
+	M.click(a, "secondary")
+	M.select(a, "bp:jeans")
+	M.click(a, "secondary")
+	layers = a.visual_override.layers
+	local order = {}
+	for _, l in ipairs(layers) do
+		order[#order + 1] = l.texture:match("player/(%w+)") .. (l.below and "-below" or "")
 	end
-	for _, t in ipairs(farm_lib.label_texts()) do
-		truthy(files[farm_lib.label_texture(t)], t)
-	end
+	eq(table.concat(order, " "), "cape-below trousers cape cap", "cape behind on front/side, over on the back")
+	eq(table.concat(layers[1].rows, ","), "0,1")
+	eq(table.concat(layers[3].rows, ","), "2")
+	truthy(has_message(a, "F5"))
+	-- the same item again takes it off
+	M.select(a, "bp:red_cap")
+	M.click(a, "secondary")
+	eq(account(a).outfit.hat, nil)
+	eq(#a.visual_override.layers, 3, "cape (two layers) and jeans")
+	-- an item that leaves the inventory comes off within a few seconds
+	local sets = a.visual_sets
+	a:take({ item = M.id("bp:jeans"), count = 1 })
+	M.advance(4)
+	eq(account(a).outfit.pants, nil)
+	eq(#a.visual_override.layers, 2, "just the cape")
+	eq(a.visual_sets, sets + 1, "sent once, not every check")
+	M.advance(10)
+	eq(a.visual_sets, sets + 1)
+end)
+
+test("an outfit is saved and put back on when the player comes back", function()
+	fresh()
+	local a = dev("alice")
+	a:give({ item = M.id("bp:straw_hat"), count = 1 })
+	M.select(a, "bp:straw_hat")
+	M.click(a, "secondary")
+	eq(a.visual_override.layers[1].texture, "textures/player/straw_hat.png")
+	eq(a.visual_override.layers[1].tint, nil, "the straw hat has its own colours")
+	M.leave(a)
+	local a2 = dev("alice")
+	eq(account(a2).outfit.hat, "straw_hat")
+	eq(a2.visual_override.layers[1].texture, "textures/player/straw_hat.png")
+	-- nothing worn: no override at all
+	local b = dev("bob")
+	eq(b.visual_override, nil)
+	eq(b.visual_sets, 1, "the plain sprite is set explicitly on join")
 end)
 
 test("a small lock protects its square and nothing else", function()

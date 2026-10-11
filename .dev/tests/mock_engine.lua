@@ -102,6 +102,30 @@ end
 function Player:set_pos(x, y, z)
 	self.x, self.y, self.z = x, y, z
 end
+-- Like the engine (0.1.7): replaces the player's appearance; nil clears it.
+local function check_override(t)
+	if t == nil then
+		return
+	end
+	assert(type(t) == "table", "visual_override must be a table or nil")
+	if t.layers ~= nil then
+		assert(type(t.layers) == "table" and #t.layers <= 16, "layers: at most 16")
+		for _, l in ipairs(t.layers) do
+			assert(type(l.texture) == "string" and l.texture ~= "", "layer texture")
+			for _, r in ipairs(l.rows or {}) do
+				assert(math.type(r) == "integer" and r >= 0 and r <= 7, "layer rows are 0..7")
+			end
+			for _, c in ipairs(l.tint or {}) do
+				assert(math.type(c) == "integer" and c >= 0 and c <= 255, "tint is 0..255 integers")
+			end
+		end
+	end
+end
+function Player:set_visual_override(t)
+	check_override(t)
+	self.visual_override = t
+	self.visual_sets = (self.visual_sets or 0) + 1
+end
 function Player:damage(amount, cause)
 	self.health = self.health - amount
 	if self.health <= 0 then
@@ -341,6 +365,44 @@ function M.load(opts)
 			spawn = function(kind, pos, opts)
 				assert(M.entity_kinds[kind], "unknown entity kind " .. tostring(kind))
 				local e = { kind = kind, x = pos.x, y = pos.y, z = pos.z, opts = opts, moves = 0 }
+				local function text_value(t)
+					if type(t) == "table" then
+						return t.value
+					end
+					return t
+				end
+				local function set_text(self, t)
+					local v = text_value(t)
+					if type(t) == "table" and v == nil then
+						v = self.text
+					end
+					assert(v == nil or #v <= 64, "label text over 64 bytes")
+					self.text = (v ~= "" and v) or nil
+					self.text_style = type(t) == "table" and t or self.text_style
+				end
+				set_text(e, opts and opts.text)
+				e.text_sets = 0
+				function e.set_text(self, t)
+					set_text(self, t)
+					self.text_sets = self.text_sets + 1
+				end
+				function e.get_text(self)
+					return self.text
+				end
+				function e.attach_to(self, parent, o)
+					self.parent, self.attach = parent, o or {}
+				end
+				function e.detach(self)
+					self.parent, self.attach = nil, nil
+				end
+				function e.set_visual_override(self, t)
+					check_override(t)
+					self.opts = self.opts or {}
+					self.opts.visual_override = t
+				end
+				function e.set_clip(self, name)
+					self.clip = name
+				end
 				function e.set_pos(self, x, y, z)
 					self.x, self.y, self.z, self.moves = x, y, z, self.moves + 1
 				end
@@ -434,6 +496,12 @@ end
 -- position; afterwards the entity is gone and its inventory erased.
 function M.leave(p)
 	M.fire("player_leave", p)
+	-- the engine removes entities attached to a player who leaves
+	for i = #M.entities, 1, -1 do
+		if M.entities[i].parent == p then
+			table.remove(M.entities, i)
+		end
+	end
 	p.gone = true
 	M.players[p.name] = nil
 	p.slots = {}

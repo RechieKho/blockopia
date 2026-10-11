@@ -56,6 +56,7 @@ function M.on_join(name, login)
 	rec.recipes = rec.recipes or {}
 	rec.stats = rec.stats or {}
 	rec.inventory = rec.inventory or {}
+	rec.outfit = rec.outfit or {}
 	rec.ready = false
 	if live[name] then
 		return false
